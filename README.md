@@ -3,7 +3,7 @@
 A Wireshark Lua plugin to dissect SECIO protocol packets with support of decryption. This plugin indended to run with go-libp2p-secio [fork](https://github.com/michaelvoronov/go-libp2p-secio) since it supports dumping secret symmetric keys. 
 
 ## Usage:
-Copy `main.lua` into your Wireshark `Personal Plugins` folder. To find out where it is located, open Wireshark and go to **Help->About Wireshark** and it will be listed in the **Folders** tab. You may need to create the folder the first time.
+Copy the whole directory into your Wireshark `Personal Plugins` folder. To find out where it is located, open Wireshark and go to **Help->About Wireshark** and it will be listed in the **Folders** tab. You may need to create the folder the first time.
 
 Another prerequisite is to define environment variable `LIBP2P_SECIO_KEYLOG` that should be pointer to the file with secret keys.
 

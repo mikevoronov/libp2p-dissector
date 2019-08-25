@@ -197,9 +197,11 @@ function SECIO.dissector (buffer, pinfo, tree)
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
         local hash_size = local_hash_size
+        -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
-            -- if seen this packet for the first time, we need to decrypt it
-            if (src_port == pinfo.src_port) then
+            -- [4 bytes len(therest)][ cipher(data) ][ H(cipher(data)) ]
+            -- CTR mode AES
+            if (Config.src_port == pinfo.src_port) then
                 plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size))
             else
                 plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size))

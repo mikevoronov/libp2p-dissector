@@ -1,0 +1,23 @@
+.tags
+.tags_sorted_by_file
+tags
+cscope.*
+
+
+# MAC Stuff #
+#################
+*.fuse_hidden*
+.DS_Store
+._.DS_Store
+
+
+# Editor-specific for ST/VI/Emacs #
+###################################
+*.sublime-*
+*.sw*
+*~
+BROWSE
+
+# IDEA
+####################################
+.idea/*

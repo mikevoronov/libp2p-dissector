@@ -1,6 +1,6 @@
 # SECIO Protocol Dissector
 
-A Wireshark Lua plugin to dissect SECIO protocol packets with support of decryption. This plugin indended to run with [this fork](https://github.com/michaelvoronov/go-libp2p-secio) of go-libp2p-secio since it supports dumping secret symmetric keys. 
+A Wireshark Lua plugin to dissect SECIO protocol packets with support of decryption. This plugin indended to run with go-libp2p-secio [fork](https://github.com/michaelvoronov/go-libp2p-secio) since it supports dumping secret symmetric keys. 
 
 ## Usage:
 Copy the `main.lua` into your Wireshark `Personal Plugins` folder. To find out where it is located, open Wireshark and go to **Help->About Wireshark** and it will be listed in the **Folders** tab. You may need to create the folder the first time.
@@ -9,18 +9,13 @@ Another prerequisite is to define environment variable `LIBP2P_SECIO_KEYLOG` tha
 
 To run plugin you need to open Wireshark, sniff (or load from a dump) network traffic and then activate plugin via **Help->About Wireshark**.
 
-local pb = require ("pb")
-local protoc = require ("protoc")
-local csv = require("csv")
-local base64 = require ("base64")
-local ffi = require ("ffi")
-local C = ffi.C
-local ssl = ffi.load "ssl"
-
 ## Prerequisites
+
 You need some lua packets installed:
    - ffi (`luarocks install --server=http://luarocks.org/dev luaffi`)
    - pb (`luarocks install lua-protobuf`) 
    - protoc (`luarocks install protoc`)
    - lua (`luarocks install csv`)
    - base64 (`luarocks install lbase64`)
+   
+Please be sure, that Wireshark has access to these plugins on your setup.

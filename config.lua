@@ -69,6 +69,8 @@ function Config:load_config(key_file_path)
     -- these fields given in the ip:port format
     self.src_port = string.format("%d", string.match(self.src_port, ":(%d+)"))
     self.dst_port = string.format("%d", string.match(self.dst_port, ":(%d+)"))
+    self.src_port = tonumber(self.src_port)
+    self.dst_port = tonumber(self.dst_port)
 
     print(self.src_port .. " will be used as the src port")
     print(self.dst_port .. " will be used as the dst port")

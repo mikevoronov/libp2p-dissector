@@ -18,11 +18,11 @@ local function makeMsgDecryptor(cipher_type, key, iv)
 
         -- set up the cipher type
         if "AES-128" == cipher_type then
-            -- EVP_DecryptInit_ex returns 1 if succed and 0 otherwise
+            -- EVP_DecryptInit_ex returns 1 if succeed and 0 otherwise
             assert(1 == C.EVP_DecryptInit_ex(ctx, C.EVP_aes_128_ctr(), nil, key, iv))
         elseif "AES-256" == cipher_type then
-            -- EVP_DecryptInit_ex returns 1 if succed and 0 otherwise
-            assert(1 == C.EVP_EncryptInit_ex(ctx, C.EVP_aes_256_ctr(), nil, key, iv))
+            -- EVP_DecryptInit_ex returns 1 if succeed and 0 otherwise
+            assert(1 == C.EVP_DecryptInit_ex(ctx, C.EVP_aes_256_ctr(), nil, key, iv))
         else
             error('Unsupported ciphertype: ' .. cipher_type .. ". At now, only AES-128,AES-256 are supported")
         end
@@ -146,8 +146,8 @@ function SECIO.dissector (buffer, pinfo, tree)
         end
 
         if (propose.pubkey ~= nil) then
-            branch:add(fields.pubkey, buffer(offset, propose.pubkey:len() + 3))
-            offset = offset + propose.pubkey:len() + 3
+            branch:add(fields.pubkey, buffer(offset, propose.pubkey:len() + 4))
+            offset = offset + propose.pubkey:len() + 4
         end
 
         if (propose.exchanges ~= nil) then
@@ -196,16 +196,16 @@ function SECIO.dissector (buffer, pinfo, tree)
     else
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hash_size = local_hash_size
+        local hash_size = local_hash_size + 12
         -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
-            -- [4 bytes len(therest)][ cipher(data) ][ H(cipher(data)) ]
+            -- [4 bytes len][ cipher text ][ H(cipher text) ]
             -- CTR mode AES
             if (Config.src_port == pinfo.src_port) then
-                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size))
+                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size - 12))
             else
-                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size))
-                hash_size = remote_hash_size
+                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size - 12))
+                hash_size = remote_hash_size + 12
             end
 
             decrypted_msgs[pinfo.number] = plain_text
@@ -214,7 +214,7 @@ function SECIO.dissector (buffer, pinfo, tree)
         end
 
         subtree:add(buffer(0, 4), string.format("cipher text size: 0x%x bytes", cipher_txt_size))
-        subtree:add(buffer(4, cipher_txt_size - hash_size), string.format("cipher test: decrypted: %s", Struct.tohex(tostring(plain_text))) )
+        subtree:add(buffer(4, cipher_txt_size - hash_size), string.format("cipher text: plain text is %s", Struct.tohex(tostring(plain_text))) )
 
         Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hash_size):tvb(), pinfo, tree)
     end

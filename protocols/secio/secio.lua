@@ -4,7 +4,6 @@ if not _G['secio_dissector'] then return end
 require("openssl_ffi")
 local ffi = require("ffi")
 local C = ffi.C
-local ssl = ffi.load "ssl"
 
 local pb = require ("pb")
 
@@ -217,7 +216,7 @@ function SECIO.dissector (buffer, pinfo, tree)
         subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", cipher_txt_size))
         offset = offset + 4
 
-        subtree:add(buffer(offset, cipher_txt_size - hmac_size),
+        local mplexTree = subtree:add(buffer(offset, cipher_txt_size - hmac_size),
             string.format("cipher text: plain text is (0x%X bytes) %s",
                 #plain_text, Struct.tohex(tostring(plain_text)))
         )
@@ -225,7 +224,7 @@ function SECIO.dissector (buffer, pinfo, tree)
 
         subtree:add(buffer(offset, hmac_size), string.format("HMAC (0x%X bytes)", hmac_size))
 
-        Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hmac_size):tvb(), pinfo, tree)
+        Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hmac_size):tvb(), pinfo, mplexTree)
     end
 end
 

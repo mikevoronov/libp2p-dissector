@@ -26,3 +26,4 @@ Config:load_config(key_file_path)
 -- help wireshark find other modules
 package.prepend_path("protocols")
 package.prepend_path("protocols/secio")
+package.prepend_path("protocols/mplex")

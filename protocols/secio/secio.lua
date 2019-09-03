@@ -84,8 +84,7 @@ local remoteExchangeFrameNumber = -1
 local decrypted_msgs = {}
 
 function SECIO.dissector (buffer, pinfo, tree)
-    local offset = 0
-
+    -- TODO: implement multistream dissector
     -- the message should be at least 16 symbols ("./secio/ 1.0.0.")
     if buffer:len() < 16 then
         local subtree = tree:add(SECIO, "SECIO protocol")
@@ -137,7 +136,7 @@ function SECIO.dissector (buffer, pinfo, tree)
         local branch = subtree:add("Propose", fields.propose)
 
         local propose = assert(pb.decode("Propose", buffer:raw(4, cipher_txt_size)))
-        offset = 4
+        local offset = 4
 
         -- check for fields presence and add them to the tree
         if (propose.rand ~= nil) then
@@ -214,8 +213,14 @@ function SECIO.dissector (buffer, pinfo, tree)
             plain_text = decrypted_msgs[pinfo.number]
         end
 
-        subtree:add(buffer(0, 4), string.format("cipher text size: 0x%x bytes", cipher_txt_size))
-        subtree:add(buffer(4, cipher_txt_size - hash_size), string.format("cipher text: plain text is %s", Struct.tohex(tostring(plain_text))) )
+        local offset = 0
+        subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", cipher_txt_size))
+        offset = offset + 4
+
+        subtree:add(buffer(offset, cipher_txt_size - hash_size), string.format("cipher text: plain text is (0x%X bytes) %s", #plain_text, Struct.tohex(tostring(plain_text))) )
+        offset = offset + cipher_txt_size - hash_size
+
+        subtree:add(buffer(offset, hash_size), string.format("HMAC (0x%X bytes)", hash_size))
 
         Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hash_size):tvb(), pinfo, tree)
     end

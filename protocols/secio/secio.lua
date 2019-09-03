@@ -54,8 +54,8 @@ end
 
 local Config = require("config")
 -- TODO: improve determiniting the hash sizes
-local local_hash_size = 32
-local remote_hash_size = 32
+local local_hmac_size = 32
+local remote_hmac_size = 32
 local localMsgDecryptor = makeMsgDecryptor(Config.local_ct, Config.local_key, Config.local_iv)
 local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_ct, Config.remote_key, Config.remote_iv)
 
@@ -195,17 +195,17 @@ function SECIO.dissector (buffer, pinfo, tree)
     else
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hash_size = local_hash_size
+        local hmac_size = local_hmac_size
 
         -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             -- CTR mode AES
             if (Config.src_port == pinfo.src_port) then
-                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size))
+                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hmac_size))
             else
-                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size))
-                hash_size = remote_hash_size
+                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hmac_size))
+                hmac_size = remote_hmac_size
             end
 
             decrypted_msgs[pinfo.number] = plain_text
@@ -217,12 +217,15 @@ function SECIO.dissector (buffer, pinfo, tree)
         subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", cipher_txt_size))
         offset = offset + 4
 
-        subtree:add(buffer(offset, cipher_txt_size - hash_size), string.format("cipher text: plain text is (0x%X bytes) %s", #plain_text, Struct.tohex(tostring(plain_text))) )
-        offset = offset + cipher_txt_size - hash_size
+        subtree:add(buffer(offset, cipher_txt_size - hmac_size),
+            string.format("cipher text: plain text is (0x%X bytes) %s",
+                #plain_text, Struct.tohex(tostring(plain_text)))
+        )
+        offset = offset + cipher_txt_size - hmac_size
 
-        subtree:add(buffer(offset, hash_size), string.format("HMAC (0x%X bytes)", hash_size))
+        subtree:add(buffer(offset, hmac_size), string.format("HMAC (0x%X bytes)", hmac_size))
 
-        Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hash_size):tvb(), pinfo, tree)
+        Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hmac_size):tvb(), pinfo, tree)
     end
 end
 

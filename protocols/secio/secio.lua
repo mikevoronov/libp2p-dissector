@@ -4,6 +4,7 @@ if not _G['secio_dissector'] then return end
 require("openssl_ffi")
 local ffi = require("ffi")
 local C = ffi.C
+ffi.load("ssl")
 
 local pb = require ("pb")
 

@@ -1,7 +1,9 @@
+local libp2p_dissector_version = "0.1.1"
+
 -- latest development release of Wireshark supports plugin version information
 if set_plugin_info then
     local my_info = {
-        version   = "1.0",
+        version   = libp2p_dissector_version,
         author    = "Mike Voronov",
         email     = "michail.vms@gmail.com",
         details   = "This is a plugin for Wireshark, to dissect SECIO protocol messages.",

@@ -52,7 +52,7 @@ local function makeMsgDecryptor(cipher_type, key, iv)
 end
 
 local Config = require("config")
--- TODO: improve determiniting the hash sizes
+-- TODO: improve determining the hash sizes
 local local_hmac_size = 32
 local remote_hmac_size = 32
 local localMsgDecryptor = makeMsgDecryptor(Config.local_ct, Config.local_key, Config.local_iv)

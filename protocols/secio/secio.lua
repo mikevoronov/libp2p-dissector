@@ -54,8 +54,8 @@ end
 
 local Config = require("config")
 -- TODO: improve determiniting the hash sizes
-local local_hash_size = Config.local_mac:len()
-local remote_hash_size = Config.remote_mac:len()
+local local_hash_size = 32
+local remote_hash_size = 32
 local localMsgDecryptor = makeMsgDecryptor(Config.local_ct, Config.local_key, Config.local_iv)
 local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_ct, Config.remote_key, Config.remote_iv)
 
@@ -196,16 +196,17 @@ function SECIO.dissector (buffer, pinfo, tree)
     else
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hash_size = local_hash_size + 12
+        local hash_size = local_hash_size
+
         -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
-            -- [4 bytes len][ cipher text ][ H(cipher text) ]
+            -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             -- CTR mode AES
             if (Config.src_port == pinfo.src_port) then
-                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size - 12))
+                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hash_size))
             else
-                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size - 12))
-                hash_size = remote_hash_size + 12
+                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hash_size))
+                hash_size = remote_hash_size
             end
 
             decrypted_msgs[pinfo.number] = plain_text

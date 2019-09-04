@@ -7,6 +7,7 @@ local C = ffi.C
 ffi.load("ssl")
 
 local pb = require ("pb")
+require("proto")
 
 -- returns lamdba that can decrypt SECIO messages based on the provided cipher settings
 local function makeMsgDecryptor(cipher_type, key, iv)
@@ -61,19 +62,18 @@ local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_ct, Config.remote_key,
 
 SECIO = Proto("secio", "SECIO protocol")
 
-local fields = SECIO.fields
 -- fields related to Propose packets type
-fields.propose = ProtoField.bytes ("Propose", "propose")
-fields.rand = ProtoField.bytes ("Propose.rand", "rand")
-fields.pubkey = ProtoField.bytes ("Propose.pubkey", "pubkey")
-fields.exchanges = ProtoField.string ("Propose.exchanges", "exchanges")
-fields.ciphers = ProtoField.string ("Propose.ciphers", "ciphers")
-fields.hashes = ProtoField.string ("Propose.hashes", "hashes")
+SECIO.fields.propose = ProtoField.bytes("Propose", "propose")
+SECIO.fields.rand = ProtoField.bytes("Propose.rand", "rand")
+SECIO.fields.pubkey = ProtoField.bytes("Propose.pubkey", "pubkey")
+SECIO.fields.exchanges = ProtoField.string("Propose.exchanges", "exchanges")
+SECIO.fields.ciphers = ProtoField.string("Propose.ciphers", "ciphers")
+SECIO.fields.hashes = ProtoField.string("Propose.hashes", "hashes")
 
 -- fields related to Exchange packets type
-fields.exchange = ProtoField.bytes ("Exchange", "exchange")
-fields.epubkey = ProtoField.string ("Exchange.epubkey", "epubkey")
-fields.signature = ProtoField.string ("Exchange.signature", "signature")
+SECIO.fields.exchange = ProtoField.bytes("Exchange", "exchange")
+SECIO.fields.epubkey = ProtoField.string("Exchange.epubkey", "epubkey")
+SECIO.fields.signature = ProtoField.string("Exchange.signature", "signature")
 
 -- since the dissector function could be invoked many times, we need to save some info
 -- to avoid parsing and decrypting on each invocation
@@ -133,34 +133,34 @@ function SECIO.dissector (buffer, pinfo, tree)
         end
 
         subtree:add(buffer(0, 4), string.format("Propose message size 0x%x bytes", cipher_txt_size))
-        local branch = subtree:add("Propose", fields.propose)
+        local branch = subtree:add("Propose", SECIO.fields.propose)
 
         local propose = assert(pb.decode("Propose", buffer:raw(4, cipher_txt_size)))
         local offset = 4
 
         -- check for fields presence and add them to the tree
         if (propose.rand ~= nil) then
-            branch:add(fields.rand, buffer(offset, propose.rand:len() + 3))
+            branch:add(SECIO.fields.rand, buffer(offset, propose.rand:len() + 3))
             offset = offset + propose.rand:len() + 3
         end
 
         if (propose.pubkey ~= nil) then
-            branch:add(fields.pubkey, buffer(offset, propose.pubkey:len() + 4))
+            branch:add(SECIO.fields.pubkey, buffer(offset, propose.pubkey:len() + 4))
             offset = offset + propose.pubkey:len() + 4
         end
 
         if (propose.exchanges ~= nil) then
-            branch:add(fields.exchanges, buffer(offset, propose.exchanges:len()))
+            branch:add(SECIO.fields.exchanges, buffer(offset, propose.exchanges:len()))
             offset = offset + propose.exchanges:len()
         end
 
         if (propose.ciphers ~= nil) then
-            branch:add(fields.ciphers, buffer(offset + 2, propose.ciphers:len()))
+            branch:add(SECIO.fields.ciphers, buffer(offset + 2, propose.ciphers:len()))
             offset = offset + propose.ciphers:len()
         end
 
         if (propose.hashes ~= nil) then
-            branch:add(fields.hashes, buffer(offset + 4, propose.hashes:len()))
+            branch:add(SECIO.fields.hashes, buffer(offset + 4, propose.hashes:len()))
             offset = offset + propose.hashes:len()
         end
     elseif (localExchangeFrameNumber == -1 or remoteExchangeFrameNumber == -1)
@@ -177,19 +177,19 @@ function SECIO.dissector (buffer, pinfo, tree)
         end
 
         subtree:add(buffer(0, 4), string.format("Exchange message size 0x%x bytes", cipher_txt_size))
-        local branch = subtree:add("Exchange", fields.exchange)
+        local branch = subtree:add("Exchange", SECIO.fields.exchange)
 
         local exchange = assert(pb.decode("Exchange", buffer:raw(4, cipher_txt_size)))
         offset = 4
 
         -- check for fields presence and add them to the tree
         if (exchange.epubkey ~= nil) then
-            branch:add(fields.epubkey, buffer(offset, exchange.epubkey:len() + 2))
+            branch:add(SECIO.fields.epubkey, buffer(offset, exchange.epubkey:len() + 2))
             offset = offset + exchange.epubkey:len() + 2
         end
 
         if (exchange.signature ~= nil) then
-            branch:add(fields.signature, buffer(offset, exchange.signature:len() + 2))
+            branch:add(SECIO.fields.signature, buffer(offset, exchange.signature:len() + 2))
             offset = offset + exchange.signature:len() + 2
         end
     else

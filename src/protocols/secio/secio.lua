@@ -1,67 +1,19 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-require("openssl_ffi")
-local ffi = require("ffi")
-local C = ffi.C
-ffi.load("ssl")
-
+local config = require("config")
+local utils = require("secio_misc")
 local pb = require ("pb")
 
--- returns lamdba that can decrypt SECIO messages based on the provided cipher settings
-local function makeMsgDecryptor(cipher_type, key, iv)
-    -- returns lamdba that can decrypt raw cipher text based on the provided parameters
-    local function makeDecryptor(cipher_type, key, iv)
-        -- initialize the cipher context
-        local ctx = C.EVP_CIPHER_CTX_new()
-        assert(ctx ~= nil)
-
-        -- set up the cipher type
-        if "AES-128" == cipher_type then
-            -- EVP_DecryptInit_ex returns 1 if succeed and 0 otherwise
-            assert(1 == C.EVP_DecryptInit_ex(ctx, C.EVP_aes_128_ctr(), nil, key, iv))
-        elseif "AES-256" == cipher_type then
-            -- EVP_DecryptInit_ex returns 1 if succeed and 0 otherwise
-            assert(1 == C.EVP_DecryptInit_ex(ctx, C.EVP_aes_256_ctr(), nil, key, iv))
-        else
-            error('Unsupported ciphertype: ' .. cipher_type .. ". At now, only AES-128,AES-256 are supported")
-        end
-
-        -- return lamdba that can decrypt supplied cipher text
-        return function(cipher_text)
-            if not cipher_text then
-                print("EVP_CIPHER_CTX_free")
-                C.EVP_CIPHER_CTX_free(ctx)
-                return
-            end
-
-            local cipher_text_len = #cipher_text
-            local plain_text = ffi.new("unsigned char[?]", cipher_text_len)
-            local ffi_len = ffi.new 'int[1]'
-            assert(1 == C.EVP_DecryptUpdate(ctx, plain_text, ffi_len, cipher_text, cipher_text_len))
-            return ffi.string(plain_text, ffi_len[0])
-        end
-    end
-
-    local decryptor = makeDecryptor(cipher_type, key, iv)
-
-    -- return lamdba that can decrypt supplied message
-    return function (msg)
-        --print("enc len " .. #msg)
-        return decryptor(msg)
-    end
-end
-
-local Config = require("config")
--- TODO: improve determining the hash sizes
-local local_hmac_size = 32
-local remote_hmac_size = 32
-local localMsgDecryptor = makeMsgDecryptor(Config.local_cipher_type, Config.local_key, Config.local_iv)
-local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_cipher_type, Config.remote_key, Config.remote_iv)
+local local_hmac_size = utils:hashSize(config.local_hmac_type)
+local remote_hmac_size = utils:hashSize(config.remote_hmac_type)
+local localMsgDecryptor = utils:makeMsgDecryptor(config.local_cipher_type, config.local_key, config.local_iv)
+local remoteMsgDecryptor = utils:makeMsgDecryptor(config.remote_cipher_type, config.remote_key, config.remote_iv)
 
 SECIO = Proto("secio", "SECIO protocol")
 
 local fields = SECIO.fields
+
 -- fields related to Propose packets type
 fields.propose = ProtoField.bytes ("Propose", "propose")
 fields.rand = ProtoField.bytes ("Propose.rand", "rand")
@@ -201,7 +153,7 @@ function SECIO.dissector (buffer, pinfo, tree)
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             -- CTR mode AES
-            if (Config.src_port == pinfo.src_port) then
+            if (config.src_port == pinfo.src_port) then
                 plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hmac_size))
             else
                 plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hmac_size))
@@ -230,5 +182,5 @@ function SECIO.dissector (buffer, pinfo, tree)
 end
 
 tcp_table = DissectorTable.get ("tcp.port")
-tcp_table:add(Config.src_port, SECIO)
-tcp_table:add(Config.dst_port, SECIO)
+tcp_table:add(config.src_port, SECIO)
+tcp_table:add(config.dst_port, SECIO)

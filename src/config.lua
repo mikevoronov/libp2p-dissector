@@ -20,8 +20,11 @@ local Config = {
     -- MAC for outgoing connections
     local_mac = "",
 
+    -- HMAC type for outgoing connections
+    local_hmac_type = "",
+
     -- Cipher type for outgoing connections
-    local_ct = "",
+    local_cipher_type = "",
 
     -- Secret key for incomning connections
     remote_key = "",
@@ -33,40 +36,34 @@ local Config = {
     remote_mac = "",
 
     -- Cipher type for incomning connections
-    remote_ct = ""
+    remote_cipher_type = "",
+
+    -- HMAC type for incomning connections
+    remote_hmac_type = ""
 }
 
 function Config:load_config(key_file_path)
-    local key_file = csv.open(key_file_path)
+    local key_file = csv.open(key_file_path, {separator = ",", header = true})
 
-    for fields in key_file:lines() do
-        -- TODO: improve the "algo"
-        for i, v in ipairs(fields) do
-            if i == 1 then
-                self.src_port = v
-            elseif i == 2 then
-                self.dst_port = v
-            elseif i == 3 then
-                self.local_key = v
-            elseif i == 4 then
-                self.local_iv = v
-            elseif i == 5 then
-                self.local_mac = v
-            elseif i == 6 then
-                self.local_ct = v
-            elseif i == 7 then
-                self.remote_key = v
-            elseif i == 8 then
-                self.remote_iv = v
-            elseif i == 9 then
-                self.remote_mac = v
-            elseif i == 10 then
-                self.remote_ct = v
-            end
+    for record in key_file:lines() do
+        -- there are several emtpy strings on valid file - looks like a bug in the csv lib
+        if(record["local_addr"] ~= "") then
+            self.src_port = record["local_addr"]
+            self.dst_port = record["remote_addr"]
+            self.local_key = record["local_key"]
+            self.local_iv = record["local_iv"]
+            self.local_cipher_type = record["local_cipher_type"]
+            self.local_mac = record["local_mac"]
+            self.local_hmac_type = record["local_hmac_type"]
+            self.remote_key = record["remote_key"]
+            self.remote_iv = record["remote_iv"]
+            self.remote_cipher_type = record["remote_cipher_type"]
+            self.remote_mac = record["local_mac"]
+            self.remote_hmac_type = record["local_hmac_type"]
         end
     end
 
-    -- these fields given in the ip:port format
+    -- local_addr and remote_addr are given in the ip:port format
     self.src_port = string.format("%d", string.match(self.src_port, ":(%d+)"))
     self.dst_port = string.format("%d", string.match(self.dst_port, ":(%d+)"))
     self.src_port = tonumber(self.src_port)

@@ -56,8 +56,8 @@ local Config = require("config")
 -- TODO: improve determining the hash sizes
 local local_hmac_size = 32
 local remote_hmac_size = 32
-local localMsgDecryptor = makeMsgDecryptor(Config.local_ct, Config.local_key, Config.local_iv)
-local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_ct, Config.remote_key, Config.remote_iv)
+local localMsgDecryptor = makeMsgDecryptor(Config.local_cipher_type, Config.local_key, Config.local_iv)
+local remoteMsgDecryptor = makeMsgDecryptor(Config.remote_cipher_type, Config.remote_key, Config.remote_iv)
 
 SECIO = Proto("secio", "SECIO protocol")
 

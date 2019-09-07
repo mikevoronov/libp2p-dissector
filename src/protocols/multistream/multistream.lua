@@ -100,7 +100,6 @@ function multistream_proto.dissector (buffer, pinfo, tree)
     end
 
     if(MSState.handshaked == false) then
-        print("handshaked " .. tostring(listener))
         dissect_handshake(buffer, pinfo, listener)
     end
 

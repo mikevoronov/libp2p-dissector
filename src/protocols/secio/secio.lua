@@ -4,6 +4,7 @@ if not _G['secio_dissector'] then return end
 local config = require("config")
 local utils = require("secio_misc")
 local pb = require ("pb")
+local SecioState = require ("secio_state")
 
 local local_hmac_size = utils:hashSize(config.local_hmac_type)
 local remote_hmac_size = utils:hashSize(config.remote_hmac_type)
@@ -27,17 +28,9 @@ fields.exchange = ProtoField.bytes ("Exchange", "exchange")
 fields.epubkey = ProtoField.string ("Exchange.epubkey", "epubkey")
 fields.signature = ProtoField.string ("Exchange.signature", "signature")
 
--- since the dissector function could be invoked many times, we need to save some info
--- to avoid parsing and decrypting on each invocation
-local localProposeFrameNumber = -1
-local remoteProposeFrameNumber = -1
-local localExchangeFrameNumber = -1
-local remoteExchangeFrameNumber = -1
-local decrypted_msgs = {}
-
 function secio_proto.dissector (buffer, pinfo, tree)
-    -- the message should be at least 16 symbols
-    if buffer:len() < 16 then
+    -- the message should be at least 4 bytes
+    if buffer:len() < 4 then
         return
     end
 
@@ -47,15 +40,15 @@ function secio_proto.dissector (buffer, pinfo, tree)
     -- according to the spec, first 4 bytes always represents packet size
     local packet_len = buffer(0, 4):uint()
 
-    if (localProposeFrameNumber == -1 or remoteProposeFrameNumber == -1) or
-            (pinfo.number == localProposeFrameNumber or pinfo.number == remoteProposeFrameNumber) then
+    if (SecioState.listenerProposePacketId == -1 or SecioState.dialerProposePacketId == -1) or
+            (pinfo.number == SecioState.listenerProposePacketId or pinfo.number == SecioState.dialerProposePacketId) then
 
         pinfo.cols.info = "SECIO Propose"
 
-        if not pinfo.visited and (localProposeFrameNumber == -1) then
-            localProposeFrameNumber = pinfo.number
-        elseif not pinfo.visited and (remoteProposeFrameNumber == -1) then
-            remoteProposeFrameNumber = pinfo.number
+        if not pinfo.visited and (SecioState.listenerProposePacketId == -1) then
+            SecioState.listenerProposePacketId = pinfo.number
+        elseif not pinfo.visited and (SecioState.dialerProposePacketId == -1) then
+            SecioState.dialerProposePacketId = pinfo.number
         end
 
         subtree:add(buffer(0, 4), string.format("Propose message size 0x%x bytes", packet_len))
@@ -89,17 +82,15 @@ function secio_proto.dissector (buffer, pinfo, tree)
             branch:add(fields.hashes, buffer(offset + 4, propose.hashes:len()))
             offset = offset + propose.hashes:len()
         end
-    elseif (localExchangeFrameNumber == -1 or remoteExchangeFrameNumber == -1)
-            or (pinfo.number == localExchangeFrameNumber or pinfo.number == remoteExchangeFrameNumber) then
+    elseif (SecioState.listenerExchangePacketId == -1 or SecioState.dialerExchangePacketId == -1)
+            or (pinfo.number == SecioState.listenerExchangePacketId or pinfo.number == SecioState.dialerExchangePacketId) then
 
         pinfo.cols.info = "SECIO Exchange"
 
-        if not pinfo.visited and (localExchangeFrameNumber == -1) then
-            print("local Exchange packet seen")
-            localExchangeFrameNumber = pinfo.number
-        elseif not pinfo.visited and (remoteExchangeFrameNumber == -1) then
-            print("remote Exchange packet seen")
-            remoteExchangeFrameNumber = pinfo.number
+        if not pinfo.visited and (SecioState.listenerExchangePacketId == -1) then
+            SecioState.listenerExchangePacketId = pinfo.number
+        elseif not pinfo.visited and (SecioState.dialerExchangePacketId == -1) then
+            SecioState.dialerExchangePacketId = pinfo.number
         end
 
         subtree:add(buffer(0, 4), string.format("Exchange message size 0x%x bytes", packet_len))
@@ -134,9 +125,9 @@ function secio_proto.dissector (buffer, pinfo, tree)
                 hmac_size = remote_hmac_size
             end
 
-            decrypted_msgs[pinfo.number] = plain_text
+            SecioState.decryptedPayloads[pinfo.number] = plain_text
         else
-            plain_text = decrypted_msgs[pinfo.number]
+            plain_text = SecioState.decryptedPayloads[pinfo.number]
         end
 
         local offset = 0

@@ -145,22 +145,22 @@ function secio_proto.dissector (buffer, pinfo, tree)
     elseif (SecioState.handshaked) then
         -- encrypted packets
 
-        if (next(SecioState.crypto_params) == nil) then
+        if (next(SecioState.cryptoParams) == nil) then
             SecioState:init_crypto_params(pinfo)
         end
 
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hmac_size = SecioState.listener_hmac_size
+        local hmac_size = SecioState.listenerHMACSize
 
         -- if see this packet for the first time, we need to decrypt it
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             if (is_same_src_address(SecioState.listener, pinfo)) then
-                plain_text = SecioState.listenerMsgDecryptor(buffer:raw(4, packet_len - SecioState.listener_hmac_size))
+                plain_text = SecioState.listenerMsgDecryptor(buffer:raw(4, packet_len - SecioState.listenerHMACSize))
             else
-                plain_text = SecioState.dialerMsgDecryptor(buffer:raw(4, packet_len - SecioState.dialer_hmac_size))
-                hmac_size = SecioState.dialer_hmac_size
+                plain_text = SecioState.dialerMsgDecryptor(buffer:raw(4, packet_len - SecioState.dialerHMACSize))
+                hmac_size = SecioState.dialerHMACSize
             end
 
             SecioState.decryptedPayloads[pinfo.number] = plain_text

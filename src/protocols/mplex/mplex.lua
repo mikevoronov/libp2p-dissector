@@ -21,12 +21,10 @@ function mplex_proto.dissector(buffer, pinfo, tree)
         return
     end
 
-    print(plain_text)
     plain_text = ByteArray.new(plain_text)
     plain_text = ByteArray.tvb(plain_text, "plain text")
 
     local header, headerSize = extractUvarint(plain_text, MPLEX_UVARINT_MAX_SIZE)
-    print(header .. " - " .. headerSize)
     local headerTree = tree:add(buffer(4, headerSize), string.format("MPLEX header: uvarint decoded 0x%X", header))
     headerTree:add(buffer(4, headerSize), string.format("flags 0x%x", band(header, 0x7)))
     headerTree:add(buffer(4, headerSize), string.format("stream id 0x%x", rshift(header, 3)))

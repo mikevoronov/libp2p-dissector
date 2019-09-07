@@ -18,7 +18,6 @@ function extractUvarint(byte_stream, max_len)
         local byte = byte_stream(offset, 1):uint()
         local cut_byte = band(byte, 0x7F)
         result = bor(result, lshift(cut_byte, offset * 7))
-        print(byte .. " - " .. cut_byte .. " - " .. result)
         if byte < 0x80 then
             return result, offset + 1
         end

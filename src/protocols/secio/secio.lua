@@ -149,7 +149,7 @@ function secio_proto.dissector (buffer, pinfo, tree)
         end
 
         local offset = 0
-        subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", packet_len))
+        subtree:add(buffer(offset, 4), string.format("SECIO packet size: 0x%X bytes", packet_len))
         offset = offset + 4
 
         local mplexTree = subtree:add(buffer(offset, packet_len - hmac_size),

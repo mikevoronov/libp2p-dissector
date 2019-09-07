@@ -17,7 +17,7 @@ function mplex_proto.dissector(buffer, pinfo, tree)
 
     local plain_text = pinfo.private["plain_text"]
     if (plain_text == nil) then
-        print("mplex dissector: error while getting plain_text from private field")
+        print("mplex dissector: error while getting plain_text from the private field")
         return
     end
 

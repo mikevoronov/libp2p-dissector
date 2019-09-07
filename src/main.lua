@@ -1,4 +1,4 @@
-local libp2p_dissector_version = "0.1.3"
+local libp2p_dissector_version = "0.1.4"
 
 -- latest development release of Wireshark supports plugin version information
 if set_plugin_info then
@@ -6,8 +6,8 @@ if set_plugin_info then
         version   = libp2p_dissector_version,
         author    = "Mike Voronov",
         email     = "michail.vms@gmail.com",
-        details   = "This is a plugin for Wireshark, to dissect SECIO protocol messages.",
-        repository = "https://github.com/michaelvoronov/secio-dissector",
+        details   = "This is a plugin for Wireshark to dissect libp2p messages.",
+        repository = "https://github.com/michaelvoronov/libp2p-dissector",
         help      = [[
     HOW TO RUN THIS SCRIPT:
     Either copy the entire folder into your "Personal Plugins" directory or load it from the command line.

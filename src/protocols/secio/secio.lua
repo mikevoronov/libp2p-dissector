@@ -1,15 +1,10 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-local config = require("config")
-local utils = require("secio_misc")
+local config = require ("config")
+local utils = require ("secio_misc")
 local pb = require ("pb")
 local SecioState = require ("secio_state")
-
-local listener_hmac_size = utils:hashSize(config.local_hmac_type)
-local dialer_hmac_size = utils:hashSize(config.remote_hmac_type)
-local listenerMsgDecryptor = utils:makeMsgDecryptor(config.local_cipher_type, config.local_key, config.local_iv)
-local dialerMsgDecryptor = utils:makeMsgDecryptor(config.remote_cipher_type, config.remote_key, config.remote_iv)
 
 secio_proto = Proto("secio", "SECIO protocol")
 
@@ -42,12 +37,15 @@ function secio_proto.dissector (buffer, pinfo, tree)
 
     if (SecioState.listenerProposePacketId == -1 or SecioState.dialerProposePacketId == -1) or
             (pinfo.number == SecioState.listenerProposePacketId or pinfo.number == SecioState.dialerProposePacketId) then
+        -- propose packets
 
         pinfo.cols.info = "SECIO Propose"
 
-        if not pinfo.visited and (SecioState.listenerProposePacketId == -1) then
+        if (SecioState.listenerProposePacketId == -1) then
+            set_address(SecioState.listener, pinfo.src, pinfo.src_port)
             SecioState.listenerProposePacketId = pinfo.number
-        elseif not pinfo.visited and (SecioState.dialerProposePacketId == -1) then
+        elseif (SecioState.dialerProposePacketId == -1) then
+            set_address(SecioState.dialer, pinfo.src, pinfo.src_port)
             SecioState.dialerProposePacketId = pinfo.number
         end
 
@@ -84,12 +82,13 @@ function secio_proto.dissector (buffer, pinfo, tree)
         end
     elseif (SecioState.listenerExchangePacketId == -1 or SecioState.dialerExchangePacketId == -1)
             or (pinfo.number == SecioState.listenerExchangePacketId or pinfo.number == SecioState.dialerExchangePacketId) then
+        -- exchange packets
 
         pinfo.cols.info = "SECIO Exchange"
 
-        if not pinfo.visited and (SecioState.listenerExchangePacketId == -1) then
+        if (SecioState.listenerExchangePacketId == -1) then
             SecioState.listenerExchangePacketId = pinfo.number
-        elseif not pinfo.visited and (SecioState.dialerExchangePacketId == -1) then
+        elseif (SecioState.dialerExchangePacketId == -1) then
             SecioState.dialerExchangePacketId = pinfo.number
         end
 
@@ -110,19 +109,38 @@ function secio_proto.dissector (buffer, pinfo, tree)
             offset = offset + exchange.signature:len() + 2
         end
     else
+        -- encrypted packets
+
+        if (SecioState.crypto_params == nil) then
+            local crypto_params = config:load_config_for(pinfo.src, pinfo.src_port, pinfo.dst, pinfo.dst_port)
+            assert(next(crypto_params) ~= nil, "secio dissector: error while reading config file")
+
+            SecioState.listener_hmac_size = utils:hashSize(crypto_params.local_hmac_type)
+            SecioState.dialer_hmac_size = utils:hashSize(crypto_params.remote_hmac_type)
+            SecioState.listenerMsgDecryptor = utils:makeMsgDecryptor(
+                crypto_params.local_cipher_type,
+                crypto_params.local_key,
+                crypto_params.local_iv
+            )
+            SecioState.dialerMsgDecryptor = utils:makeMsgDecryptor(
+                crypto_params.remote_cipher_type,
+                crypto_params.remote_key,
+                crypto_params.remote_iv
+            )
+        end
+
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hmac_size = listener_hmac_size
+        local hmac_size = SecioState.listener_hmac_size
 
         -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
-            -- CTR mode AES
             if (config.src_port == pinfo.src_port) then
-                plain_text = listenerMsgDecryptor(buffer:raw(4, packet_len - listener_hmac_size))
+                plain_text = SecioState.listenerMsgDecryptor(buffer:raw(4, packet_len - SecioState.listener_hmac_size))
             else
-                plain_text = dialerMsgDecryptor(buffer:raw(4, packet_len - dialer_hmac_size))
-                hmac_size = dialer_hmac_size
+                plain_text = SecioState.dialerMsgDecryptor(buffer:raw(4, packet_len - SecioState.dialer_hmac_size))
+                hmac_size = SecioState.dialer_hmac_size
             end
 
             SecioState.decryptedPayloads[pinfo.number] = plain_text

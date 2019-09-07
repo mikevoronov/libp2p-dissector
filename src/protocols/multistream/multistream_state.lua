@@ -2,8 +2,8 @@
 if not _G['secio_dissector'] then return end
 
 local MSState = {
-    dialer = {},
     listener = {},
+    dialer = {},
     listenerMSver = nil,
     dialerMSver = nil,
     protocol = nil,

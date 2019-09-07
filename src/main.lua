@@ -1,4 +1,4 @@
-local libp2p_dissector_version = "0.1.2"
+local libp2p_dissector_version = "0.1.3"
 
 -- latest development release of Wireshark supports plugin version information
 if set_plugin_info then
@@ -19,13 +19,10 @@ end
 -- enable loading of our modules
 _G['secio_dissector'] = {}
 
+-- check that LIBP2P_SECIO_KEYLOG set
 local key_file_path = os.getenv("LIBP2P_SECIO_KEYLOG")
 assert(secret == nil, "Environment variable LIBP2P_SECIO_KEYLOG must be set")
-print("Using " .. key_file_path .. " as the key log file")
-
--- initialize config by reading a config file
-local config = require("config")
-config:load_config(key_file_path)
+print("libp2p dissector: use " .. key_file_path .. " as the key log file")
 
 -- help wireshark find other modules
 package.prepend_path("utils")

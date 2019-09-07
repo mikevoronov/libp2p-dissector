@@ -5,6 +5,7 @@ local config = require("config")
 local MSState = require("multistream_state")
 
 require("length-prefixed")
+require("net_addresses")
 
 multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
 local fields = multistream_proto.fields
@@ -81,19 +82,12 @@ end
 
 -- this disssector should be called after the "multistream 1.0.0" string observed
 function multistream_proto.dissector (buffer, pinfo, tree)
-    local function same_ip_port(table, pinfo)
-        return next(table) ~= nil and table["ip"] == tostring(pinfo.src) and table["port"] == tostring(pinfo.src_port)
-    end
-
     local listener = false
-    local dialer = false
 
-    -- heuristic multistream detector should set these fields
-    if(same_ip_port(MSState.listener, pinfo)) then
+    -- heuristic multistream detector should already set MSState.listener and MSState.dialer fields
+    if(is_same_src_address(MSState.listener, pinfo)) then
         listener = true
-    elseif(same_ip_port(MSState.dialer, pinfo)) then
-        dialer = true
-    else
+    elseif(not is_same_src_address(MSState.dialer, pinfo)) then
         -- some error occured
         print("multistream dissector: ip:port are incorrect")
         return
@@ -152,10 +146,8 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
     -- TODO: add to MSState support of multi ip/port
-    MSState.listener["ip"] = tostring(pinfo.src)
-    MSState.listener["port"] = tostring(pinfo.src_port)
-    MSState.dialer["ip"] = tostring(pinfo.dst)
-    MSState.dialer["port"] = tostring(pinfo.dst_port)
+    set_address(MSState.listener, pinfo.src, pinfo.src_port)
+    set_address(MSState.dialer, pinfo.dst, pinfo.dst_port)
 
     multistream_proto.dissector(buffer, pinfo, tree)
     return true

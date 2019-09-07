@@ -10,13 +10,13 @@ multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
 local fields = multistream_proto.fields
 
 -- Multistream fields
-fields.multistream_protocol = ProtoField.string ("multistream.protocol", "Protocol", base.NONE, nill, 0, "Protocol being negotiated on")
-fields.multistream_raw_protocol = ProtoField.string ("multistream.raw_protocol", "Raw Protocol", base.NONE, nill, 0, "Protocol being negotiated on (only set on packets with raw data)")
-fields.multistream_version = ProtoField.string ("multistream.version", "Version", base.NONE, nill, 0, "Multistream version used")
-fields.multistream_dialer = ProtoField.bool ("multistream.dialer", "Dialer", base.NONE, nill, 0, "TRUE if the packet is sent from the dialer")
-fields.multistream_listener = ProtoField.bool ("multistream.listener", "Listener", base.NONE, nill, 0, "TRUE if the packet is sent from the listener")
-fields.multistream_handshake = ProtoField.bool ("multistream.handshake", "Handshake", base.NONE, nill, 0, "TRUE if the packet is part of the handshake process")
-fields.multistream_data = ProtoField.bytes ("multistream.data", "Data", base.NONE, nill, 0, "Raw bytes transferred")
+fields.multistream_protocol = ProtoField.string ("multistream.protocol", "Protocol", base.NONE, nil, 0, "Protocol being negotiated on")
+fields.multistream_raw_protocol = ProtoField.string ("multistream.raw_protocol", "Raw Protocol", base.NONE, nil, 0, "Protocol being negotiated on (only set on packets with raw data)")
+fields.multistream_version = ProtoField.string ("multistream.version", "Version", base.NONE, nil, 0, "Multistream version used")
+fields.multistream_dialer = ProtoField.bool ("multistream.dialer", "Dialer", base.NONE, nil, 0, "TRUE if the packet is sent from the dialer")
+fields.multistream_listener = ProtoField.bool ("multistream.listener", "Listener", base.NONE, nil, 0, "TRUE if the packet is sent from the listener")
+fields.multistream_handshake = ProtoField.bool ("multistream.handshake", "Handshake", base.NONE, nil, 0, "TRUE if the packet is part of the handshake process")
+fields.multistream_data = ProtoField.bytes ("multistream.data", "Data", base.NONE, nil, 0, "Raw bytes transferred")
 
 local function dissect_handshake(buffer, pinfo, is_listener)
     local packet_len = buffer:len()

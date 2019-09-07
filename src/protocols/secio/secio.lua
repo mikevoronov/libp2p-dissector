@@ -6,27 +6,27 @@ local utils = require("secio_misc")
 local pb = require ("pb")
 local SecioState = require ("secio_state")
 
-local local_hmac_size = utils:hashSize(config.local_hmac_type)
-local remote_hmac_size = utils:hashSize(config.remote_hmac_type)
-local localMsgDecryptor = utils:makeMsgDecryptor(config.local_cipher_type, config.local_key, config.local_iv)
-local remoteMsgDecryptor = utils:makeMsgDecryptor(config.remote_cipher_type, config.remote_key, config.remote_iv)
+local listener_hmac_size = utils:hashSize(config.local_hmac_type)
+local dialer_hmac_size = utils:hashSize(config.remote_hmac_type)
+local listenerMsgDecryptor = utils:makeMsgDecryptor(config.local_cipher_type, config.local_key, config.local_iv)
+local dialerMsgDecryptor = utils:makeMsgDecryptor(config.remote_cipher_type, config.remote_key, config.remote_iv)
 
 secio_proto = Proto("secio", "SECIO protocol")
 
 local fields = secio_proto.fields
 
 -- fields related to Propose packets type
-fields.propose = ProtoField.bytes ("Propose", "propose")
-fields.rand = ProtoField.bytes ("Propose.rand", "rand")
-fields.pubkey = ProtoField.bytes ("Propose.pubkey", "pubkey")
-fields.exchanges = ProtoField.string ("Propose.exchanges", "exchanges")
-fields.ciphers = ProtoField.string ("Propose.ciphers", "ciphers")
-fields.hashes = ProtoField.string ("Propose.hashes", "hashes")
+fields.propose = ProtoField.bytes ("secio.propose", "Propose", base.NONE, nil, 0, "Propose request")
+fields.rand = ProtoField.bytes ("secio.propose.rand", "rand", base.NONE, nil, 0, "Propose random bytes")
+fields.pubkey = ProtoField.bytes ("secio.propose.pubkey", "pubkey", base.NONE, nil, 0, "Propose public key")
+fields.exchanges = ProtoField.string ("secio.propose.exchanges", "exchanges", base.NONE, nil, 0, "Propose exchanges")
+fields.ciphers = ProtoField.string ("secio.propose.ciphers", "ciphers", base.NONE, nil, 0, "Propose ciphers")
+fields.hashes = ProtoField.string ("secio.propose.hashes", "hashes", base.NONE, nil, 0, "Propose hashes")
 
 -- fields related to Exchange packets type
-fields.exchange = ProtoField.bytes ("Exchange", "exchange")
-fields.epubkey = ProtoField.string ("Exchange.epubkey", "epubkey")
-fields.signature = ProtoField.string ("Exchange.signature", "signature")
+fields.exchange = ProtoField.bytes ("secio.exchange", "exchange", base.NONE, nil, 0, "Exchange request")
+fields.epubkey = ProtoField.bytes ("secio.exchange.epubkey", "epubkey", base.NONE, nil, 0, "Ephermal public key")
+fields.signature = ProtoField.bytes ("secio.exchange.signature", "signature", base.NONE, nil, 0, "Exchange signature")
 
 function secio_proto.dissector (buffer, pinfo, tree)
     -- the message should be at least 4 bytes
@@ -112,17 +112,17 @@ function secio_proto.dissector (buffer, pinfo, tree)
     else
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hmac_size = local_hmac_size
+        local hmac_size = listener_hmac_size
 
         -- if seen this packet for the first time, we need to decrypt it
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             -- CTR mode AES
             if (config.src_port == pinfo.src_port) then
-                plain_text = localMsgDecryptor(buffer:raw(4, packet_len - local_hmac_size))
+                plain_text = listenerMsgDecryptor(buffer:raw(4, packet_len - listener_hmac_size))
             else
-                plain_text = remoteMsgDecryptor(buffer:raw(4, packet_len - remote_hmac_size))
-                hmac_size = remote_hmac_size
+                plain_text = dialerMsgDecryptor(buffer:raw(4, packet_len - dialer_hmac_size))
+                hmac_size = dialer_hmac_size
             end
 
             SecioState.decryptedPayloads[pinfo.number] = plain_text

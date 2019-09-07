@@ -2,7 +2,7 @@
 if not _G['secio_dissector'] then return end
 
 local config = require("config")
-local MSState = require("multistream_state")
+MSState = require("multistream_state")
 
 require("length-prefixed")
 require("net_addresses")
@@ -21,8 +21,18 @@ fields.multistream_data = ProtoField.bytes ("multistream.data", "Data", base.NON
 
 local function dissect_handshake(buffer, pinfo, is_listener)
     local packet_len = buffer:len()
+    local is_listener = false
 
-    if (is_listener == true) then
+    -- heuristic multistream detector should already set MSState.listener and MSState.dialer fields
+    if (is_same_src_address(MSState.listener, pinfo)) then
+        is_listener = true
+    elseif (not is_same_src_address(MSState.dialer, pinfo)) then
+        -- some error occured
+        print("multistream dissector: ip:port are incorrect")
+        return
+    end
+
+    if (is_listener) then
         if(MSState.listenerMSver == nil) then
             -- packet with protocol version
             if (packet_len < 1) then
@@ -82,19 +92,8 @@ end
 
 -- this disssector should be called after the "multistream 1.0.0" string observed
 function multistream_proto.dissector (buffer, pinfo, tree)
-    local listener = false
-
-    -- heuristic multistream detector should already set MSState.listener and MSState.dialer fields
-    if(is_same_src_address(MSState.listener, pinfo)) then
-        listener = true
-    elseif(not is_same_src_address(MSState.dialer, pinfo)) then
-        -- some error occured
-        print("multistream dissector: ip:port are incorrect")
-        return
-    end
-
-    if(MSState.handshaked == false) then
-        dissect_handshake(buffer, pinfo, listener)
+    if (not MSState.handshaked) then
+        dissect_handshake(buffer, pinfo)
     end
 
     local subtree = tree:add(multistream_proto, multistream_proto.description)
@@ -117,6 +116,10 @@ function multistream_proto.dissector (buffer, pinfo, tree)
         subtree:add(fields.multistream_protocol, buffer(0, packet_len)):append_text(" (" .. MSState.protocol .. ")")
     else
         if (MSState.protocol == "/secio/1.0.0") then
+            pinfo.private["listener_ip"] = MSState.listener["ip"]
+            pinfo.private["listener_port"] = MSState.listener["port"]
+            pinfo.private["dialer_ip"] = MSState.dialer["ip"]
+            pinfo.private["dialer_port"] = MSState.dialer["port"]
             Dissector.get("secio"):call(buffer, pinfo, tree)
             return
         end
@@ -128,7 +131,7 @@ end
 -- returns true if some packet contains a length-prefixed string "/multistream/1.0.0\n"
 local function m_heuristic_checker(buffer, pinfo, tree)
     packet_len = buffer:len()
-    if packet_len ~= 0x14 then
+    if packet_len < 0x14 then
         return false
     end
 
@@ -146,8 +149,20 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
     -- TODO: add to MSState support of multi ip/port
-    set_address(MSState.listener, pinfo.src, pinfo.src_port)
-    set_address(MSState.dialer, pinfo.dst, pinfo.dst_port)
+    if packet_len > 14 then
+        set_address(MSState.dialer, pinfo.src, pinfo.src_port)
+        set_address(MSState.listener, pinfo.dst, pinfo.dst_port)
+    else
+        set_address(MSState.listener, pinfo.src, pinfo.src_port)
+        set_address(MSState.dialer, pinfo.dst, pinfo.dst_port)
+    end
+
+    print(string.format("multistream dissector: dissector for (listener %s:%s) - (dialer %s:%s) registered",
+        tostring(MSState.listener.ip),
+        tostring(MSState.listener.port),
+        tostring(MSState.dialer.ip),
+        tostring(MSState.dialer.port))
+    )
 
     multistream_proto.dissector(buffer, pinfo, tree)
     return true

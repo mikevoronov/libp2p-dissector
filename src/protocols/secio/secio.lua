@@ -42,10 +42,10 @@ function secio_proto.dissector (buffer, pinfo, tree)
     end
 
     local subtree = tree:add(secio_proto, "SECIO protocol")
-    pinfo.cols.protocol = "SECIO"
+    pinfo.cols.protocol = secio_proto.name
 
-    -- according to the spec, there is always 4 bytes for packet size
-    local cipher_txt_size = buffer(0, 4):uint()
+    -- according to the spec, first 4 bytes always represents packet size
+    local packet_len = buffer(0, 4):uint()
 
     if (localProposeFrameNumber == -1 or remoteProposeFrameNumber == -1) or
             (pinfo.number == localProposeFrameNumber or pinfo.number == remoteProposeFrameNumber) then
@@ -58,10 +58,10 @@ function secio_proto.dissector (buffer, pinfo, tree)
             remoteProposeFrameNumber = pinfo.number
         end
 
-        subtree:add(buffer(0, 4), string.format("Propose message size 0x%x bytes", cipher_txt_size))
+        subtree:add(buffer(0, 4), string.format("Propose message size 0x%x bytes", packet_len))
         local branch = subtree:add("Propose", fields.propose)
 
-        local propose = assert(pb.decode("Propose", buffer:raw(4, cipher_txt_size)))
+        local propose = assert(pb.decode("Propose", buffer:raw(4, -1)))
         local offset = 4
 
         -- check for fields presence and add them to the tree
@@ -102,10 +102,10 @@ function secio_proto.dissector (buffer, pinfo, tree)
             remoteExchangeFrameNumber = pinfo.number
         end
 
-        subtree:add(buffer(0, 4), string.format("Exchange message size 0x%x bytes", cipher_txt_size))
+        subtree:add(buffer(0, 4), string.format("Exchange message size 0x%x bytes", packet_len))
         local branch = subtree:add("Exchange", fields.exchange)
 
-        local exchange = assert(pb.decode("Exchange", buffer:raw(4, cipher_txt_size)))
+        local exchange = assert(pb.decode("Exchange", buffer:raw(4, -1)))
         local offset = 4
 
         -- check for fields presence and add them to the tree
@@ -128,9 +128,9 @@ function secio_proto.dissector (buffer, pinfo, tree)
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             -- CTR mode AES
             if (config.src_port == pinfo.src_port) then
-                plain_text = localMsgDecryptor(buffer:raw(4, cipher_txt_size - local_hmac_size))
+                plain_text = localMsgDecryptor(buffer:raw(4, packet_len - local_hmac_size))
             else
-                plain_text = remoteMsgDecryptor(buffer:raw(4, cipher_txt_size - remote_hmac_size))
+                plain_text = remoteMsgDecryptor(buffer:raw(4, packet_len - remote_hmac_size))
                 hmac_size = remote_hmac_size
             end
 
@@ -140,18 +140,18 @@ function secio_proto.dissector (buffer, pinfo, tree)
         end
 
         local offset = 0
-        subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", cipher_txt_size))
+        subtree:add(buffer(offset, 4), string.format("MPLEX packet size: 0x%X bytes", packet_len))
         offset = offset + 4
 
-        local mplexTree = subtree:add(buffer(offset, cipher_txt_size - hmac_size),
+        local mplexTree = subtree:add(buffer(offset, packet_len - hmac_size),
             string.format("cipher text: plain text is (0x%X bytes) %s",
                 #plain_text, Struct.tohex(tostring(plain_text)))
         )
-        offset = offset + cipher_txt_size - hmac_size
+        offset = offset + packet_len - hmac_size
 
-        subtree:add(buffer(offset, hmac_size), string.format("HMAC (0x%X bytes)", hmac_size))
+        subtree:add(buffer(offset, -1), string.format("HMAC (0x%X bytes)", hmac_size))
 
-        Dissector.get("mplex"):call(buffer(4, cipher_txt_size - hmac_size):tvb(), pinfo, mplexTree)
+        Dissector.get("mplex"):call(buffer(4, packet_len - hmac_size):tvb(), pinfo, mplexTree)
     end
 end
 

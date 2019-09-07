@@ -2,7 +2,6 @@
 if not _G['secio_dissector'] then return end
 
 local MSState = {
-    handshaked = false,
     dialer = {},
     listener = {},
     listenerMSver = nil,
@@ -12,6 +11,7 @@ local MSState = {
     helloPacketId = -1,
     selectPacketId = -1,
     ackPacketId = -1,
+    handshaked = false,
 }
 
 return MSState

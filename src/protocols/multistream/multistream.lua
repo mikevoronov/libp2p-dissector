@@ -3,6 +3,7 @@ if not _G['secio_dissector'] then return end
 
 local config = require("config")
 local MSState = require("multistream_state")
+
 require("length-prefixed")
 
 multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
@@ -65,14 +66,12 @@ local function dissect_handshake(buffer, pinfo, is_listener)
             -- TODO: reassemble
             return
         end
-        print("here1 " .. protocol_name:sub(1,-2) .. bytes_len)
 
         local req_protocol_name, tt = extract_lp_hex_string(buffer(bytes_len, -1))
         if(req_protocol_name == nil) then
             -- TODO: reassemble
             return
         end
-        print("here2 " .. req_protocol_name)
 
         MSState.dialerMSver = protocol_name:sub(1, -2)
         MSState.protocol = req_protocol_name:sub(1, -2)
@@ -125,10 +124,11 @@ function multistream_proto.dissector (buffer, pinfo, tree)
         subtree:add(fields.multistream_protocol, buffer(0, packet_len)):append_text(" (" .. MSState.protocol .. ")")
     else
         if (MSState.protocol == "/secio/1.0.0") then
-            -- TODO: call secio dissector
-        else
-            error(MSState.protocol .. " protocol is unsuported")
+            Dissector.get("secio"):call(buffer, pinfo, tree)
+            return
         end
+
+        error(MSState.protocol .. " protocol is unsuported")
     end
 end
 
@@ -152,6 +152,7 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.src_port, multistream_proto)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
+    -- TODO: add to MSState support of multi ip/port
     MSState.listener["ip"] = tostring(pinfo.src)
     MSState.listener["port"] = tostring(pinfo.src_port)
     MSState.dialer["ip"] = tostring(pinfo.dst)

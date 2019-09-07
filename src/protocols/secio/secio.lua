@@ -10,9 +10,9 @@ local remote_hmac_size = utils:hashSize(config.remote_hmac_type)
 local localMsgDecryptor = utils:makeMsgDecryptor(config.local_cipher_type, config.local_key, config.local_iv)
 local remoteMsgDecryptor = utils:makeMsgDecryptor(config.remote_cipher_type, config.remote_key, config.remote_iv)
 
-SECIO = Proto("secio", "SECIO protocol")
+secio_proto = Proto("secio", "SECIO protocol")
 
-local fields = SECIO.fields
+local fields = secio_proto.fields
 
 -- fields related to Propose packets type
 fields.propose = ProtoField.bytes ("Propose", "propose")
@@ -35,41 +35,17 @@ local localExchangeFrameNumber = -1
 local remoteExchangeFrameNumber = -1
 local decrypted_msgs = {}
 
-function SECIO.dissector (buffer, pinfo, tree)
-    -- TODO: implement multistream dissector
-    -- the message should be at least 16 symbols ("./secio/ 1.0.0.")
+function secio_proto.dissector (buffer, pinfo, tree)
+    -- the message should be at least 16 symbols
     if buffer:len() < 16 then
-        local subtree = tree:add(SECIO, "SECIO protocol")
-        subtree:add(buffer(0, buffer:len()), "body")
         return
     end
+
+    local subtree = tree:add(secio_proto, "SECIO protocol")
+    pinfo.cols.protocol = "SECIO"
 
     -- according to the spec, there is always 4 bytes for packet size
     local cipher_txt_size = buffer(0, 4):uint()
-
-    -- checks that message not beginning with the "./mu" string
-    -- TODO: need to be refactored
-    if (cipher_txt_size == 0x132f6d75) then
-        -- skip the first messages with the description of protocol versions:
-        -- 00000000  13 2f 6d 75 6c 74 69 73  74 72 65 61 6d 2f 31 2e   ./multis tream/1.
-        -- 00000010  30 2e 30 0a 0d 2f 73 65  63 69 6f 2f 31 2e 30 2e   0.0../se cio/1.0.
-        -- 00000020  30 0a                                              0.
-        -- TODO: in the future we need to care about these fields
-        return
-    end
-
-    -- checks that message not beginning with the "./se" string
-    -- TODO: need to be refactored
-    if (cipher_txt_size == 0x0d2f7365) then
-        -- skip the first messages with the description of protocol versions:
-        -- 00000014  0d 2f 73 65 63 69 6f 2f  31 2e 30 2e 30 0a         ./secio/ 1.0.0.
-        -- TODO: in the future we need to care about these fields
-        return
-    end
-
-    local subtree = tree:add(SECIO, "SECIO protocol")
-
-    pinfo.cols.protocol = "SECIO"
 
     if (localProposeFrameNumber == -1 or remoteProposeFrameNumber == -1) or
             (pinfo.number == localProposeFrameNumber or pinfo.number == remoteProposeFrameNumber) then
@@ -77,10 +53,8 @@ function SECIO.dissector (buffer, pinfo, tree)
         pinfo.cols.info = "SECIO Propose"
 
         if not pinfo.visited and (localProposeFrameNumber == -1) then
-            print("local Propose packet seen")
             localProposeFrameNumber = pinfo.number
         elseif not pinfo.visited and (remoteProposeFrameNumber == -1) then
-            print("remote Propose packet seen")
             remoteProposeFrameNumber = pinfo.number
         end
 
@@ -181,6 +155,4 @@ function SECIO.dissector (buffer, pinfo, tree)
     end
 end
 
---tcp_table = DissectorTable.get ("tcp.port")
---tcp_table:add(config.src_port, SECIO)
---tcp_table:add(config.dst_port, SECIO)
+return secio_proto

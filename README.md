@@ -10,6 +10,7 @@ Another prerequisite is to define environment variable `LIBP2P_SECIO_KEYLOG` tha
 To run plugin you need to open Wireshark, sniff (or load from a dump) network traffic and then activate plugin via **Help->About Wireshark**.
 
 ![*Screenshot of plugin in use](https://raw.githubusercontent.com/michaelvoronov/secio-dissector/master/img/screen_1.png)
+![*Screenshot of plugin in use](https://raw.githubusercontent.com/michaelvoronov/secio-dissector/master/img/screen_2.png)
 
 ## Prerequisites
 

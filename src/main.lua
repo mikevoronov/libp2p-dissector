@@ -1,4 +1,4 @@
-local libp2p_dissector_version = "0.1.1"
+local libp2p_dissector_version = "0.1.2"
 
 -- latest development release of Wireshark supports plugin version information
 if set_plugin_info then
@@ -10,7 +10,7 @@ if set_plugin_info then
         repository = "https://github.com/michaelvoronov/secio-dissector",
         help      = [[
     HOW TO RUN THIS SCRIPT:
-    Either copy this folder into your "Personal Plugins" directory or load it from the command line.
+    Either copy the entire folder into your "Personal Plugins" directory or load it from the command line.
     ]]
     }
     set_plugin_info(libp2p_dissector_info)
@@ -23,10 +23,12 @@ local key_file_path = os.getenv("LIBP2P_SECIO_KEYLOG")
 assert(secret == nil, "Environment variable LIBP2P_SECIO_KEYLOG must be set")
 print("Using " .. key_file_path .. " as the key log file")
 
-local Config = require("config")
-Config:load_config(key_file_path)
+-- initialize config by reading a config file
+local config = require("config")
+config:load_config(key_file_path)
 
 -- help wireshark find other modules
+package.prepend_path("utils")
 package.prepend_path("protocols")
 package.prepend_path("protocols/multistream")
 package.prepend_path("protocols/secio")

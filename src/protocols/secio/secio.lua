@@ -132,7 +132,7 @@ function SECIO.dissector (buffer, pinfo, tree)
         local branch = subtree:add("Exchange", fields.exchange)
 
         local exchange = assert(pb.decode("Exchange", buffer:raw(4, cipher_txt_size)))
-        offset = 4
+        local offset = 4
 
         -- check for fields presence and add them to the tree
         if (exchange.epubkey ~= nil) then
@@ -181,6 +181,6 @@ function SECIO.dissector (buffer, pinfo, tree)
     end
 end
 
-tcp_table = DissectorTable.get ("tcp.port")
-tcp_table:add(config.src_port, SECIO)
-tcp_table:add(config.dst_port, SECIO)
+--tcp_table = DissectorTable.get ("tcp.port")
+--tcp_table:add(config.src_port, SECIO)
+--tcp_table:add(config.dst_port, SECIO)

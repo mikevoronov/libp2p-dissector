@@ -1,15 +1,17 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-local MultistreamState = {
+local MSState = {
     handshaked = false,
-    dialer = "",
-    listener = "",
-    listenerMSver = "",
-    dialerMSver = "",
-    protocol = "",
+    dialer = {},
+    listener = {},
+    listenerMSver = nil,
+    dialerMSver = nil,
+    protocol = nil,
     supported = false,
-
+    helloPacketId = -1,
+    selectPacketId = -1,
+    ackPacketId = -1,
 }
 
--- function MultistreamState:
+return MSState

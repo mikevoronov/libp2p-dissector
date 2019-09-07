@@ -24,7 +24,7 @@ You need some lua packets installed:
    
 Please be sure, that Wireshark has access to these plugins on your setup.
 
-## High-level dissecting algorithm description
+## High-level dissecting algorithm overview
 
 1. At first, multistream dissector is registred as the heuristic dissector
 2. This dissecctor looks for the "/multistream/1.0.0" string in traffic, then parses multistream handshaked packets and, finally, calls secio dissector.

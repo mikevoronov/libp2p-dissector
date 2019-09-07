@@ -172,15 +172,16 @@ function secio_proto.dissector (buffer, pinfo, tree)
         subtree:add(buffer(offset, 4), string.format("SECIO packet size: 0x%X bytes", packet_len))
         offset = offset + 4
 
+        plain_text = Struct.tohex(tostring(plain_text))
         local mplexTree = subtree:add(buffer(offset, packet_len - hmac_size),
-            string.format("cipher text: plain text is (0x%X bytes) %s",
-                #plain_text, Struct.tohex(tostring(plain_text)))
+            string.format("cipher text: plain text is (0x%X bytes) %s", #plain_text, plain_text)
         )
         offset = offset + packet_len - hmac_size
 
         subtree:add(buffer(offset, -1), string.format("HMAC (0x%X bytes)", hmac_size))
 
-        Dissector.get("mplex"):call(buffer(4, packet_len - hmac_size):tvb(), pinfo, mplexTree)
+        pinfo.private["plain_text"] = plain_text
+        Dissector.get("mplex"):call(buffer, pinfo, mplexTree)
     end
 end
 

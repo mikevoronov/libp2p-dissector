@@ -19,7 +19,7 @@ fields.multistream_listener = ProtoField.bool ("multistream.listener", "Listener
 fields.multistream_handshake = ProtoField.bool ("multistream.handshake", "Handshake", base.NONE, nil, 0, "TRUE if the packet is part of the handshake process")
 fields.multistream_data = ProtoField.bytes ("multistream.data", "Data", base.NONE, nil, 0, "Raw bytes transferred")
 
-local function dissect_handshake(buffer, pinfo, is_listener)
+local function dissect_handshake(buffer, pinfo)
     local packet_len = buffer:len()
     local is_listener = false
 
@@ -47,22 +47,22 @@ local function dissect_handshake(buffer, pinfo, is_listener)
 
             MSState.listenerMSver = protocol_name:sub(1, -2)
             MSState.helloPacketId = pinfo.number
-        else
-            -- ack/nack packets
-            if (packet_len < 1) then
-                -- TODO: reassemble
-                return
-            end
-            local protocol_name, _ = extract_lp_hex_string(buffer)
-            if(protocol_name == nil) then
-                -- TODO: reassemble
-                return
-            end
-
-            MSState.supported = protocol_name:sub(1, -2) == MSState.protocol
-            MSState.handshaked = true
-            MSState.ackPacketId = pinfo.number
+            return
         end
+        -- ack/nack packets
+        if (packet_len < 1) then
+            -- TODO: reassemble
+            return
+        end
+        local protocol_name, _ = extract_lp_hex_string(buffer)
+        if(protocol_name == nil) then
+            -- TODO: reassemble
+            return
+        end
+
+        MSState.supported = protocol_name:sub(1, -2) == MSState.protocol
+        MSState.handshaked = true
+        MSState.ackPacketId = pinfo.number
         return
     end
 
@@ -100,6 +100,7 @@ function multistream_proto.dissector (buffer, pinfo, tree)
     local packet_len = buffer:len()
     pinfo.cols.protocol = multistream_proto.name
     pinfo.cols.info = "multistream"
+
     if (MSState.helloPacketId == pinfo.number) then
         pinfo.cols.info = string.format("%s ready (%s)", pinfo.cols.info, MSState.listenerMSver)
         subtree:add(fields.multistream_version, buffer(0, packet_len)):append_text(" (" .. MSState.listenerMSver .. ")")

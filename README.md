@@ -23,3 +23,10 @@ You need some lua packets installed:
    - base64 (`luarocks install lbase64`)
    
 Please be sure, that Wireshark has access to these plugins on your setup.
+
+## High-level dissecting algorithm description
+
+1. At first, multistream dissector is registred as the heuristic dissector
+2. This dissecctor looks for the "/multistream/1.0.0" string in traffic, then parses multistream handshaked packets and, finally, calls secio dissector.
+3. In its turn, secio dissector waits for Propose and Excahnge packets. And after receiving the last Exchange packet will try to open config file and try to find the last record for corresponding in/out ip:port. It is expected that after the last Exchange packet keys are already dumped.
+4. And, finally, dissect mplex.

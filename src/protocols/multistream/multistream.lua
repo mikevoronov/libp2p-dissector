@@ -1,10 +1,17 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-MSState = require("multistream_state")
-
+local MSState = require("multistream_state")
 require("length-prefixed")
 require("net_addresses")
+local t = require("table_copy")
+
+-- multistream protocol states to support multiple communication
+states = {}
+-- id of the last added state to states table
+local last_state_id = 0
+-- key used to lookup states id inside private table of pinfo
+local private_state_key = "m_state_id"
 
 multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
 local fields = multistream_proto.fields
@@ -18,21 +25,21 @@ fields.multistream_listener = ProtoField.bool ("multistream.listener", "Listener
 fields.multistream_handshake = ProtoField.bool ("multistream.handshake", "Handshake", base.NONE, nil, 0, "TRUE if the packet is part of the handshake process")
 fields.multistream_data = ProtoField.bytes ("multistream.data", "Data", base.NONE, nil, 0, "Raw bytes transferred")
 
-local function dissect_handshake(buffer, pinfo)
+local function dissect_handshake(buffer, pinfo, state)
     local packet_len = buffer:len()
     local is_listener = false
 
     -- heuristic multistream detector should already set MSState.listener and MSState.dialer fields
-    if (is_same_src_address(MSState.listener, pinfo)) then
+    if (is_same_src_address(state.listener, pinfo)) then
         is_listener = true
-    elseif (not is_same_src_address(MSState.dialer, pinfo)) then
+    elseif (not is_same_src_address(state.dialer, pinfo)) then
         -- some error occured
         print("multistream dissector: ip:port are incorrect")
         return
     end
 
     if (is_listener) then
-        if(MSState.listenerMSver == nil) then
+        if(state.listenerMSver == nil) then
             -- packet with protocol version
             if (packet_len < 1) then
                 -- TODO: reassemble
@@ -44,8 +51,8 @@ local function dissect_handshake(buffer, pinfo)
                 return
             end
 
-            MSState.listenerMSver = protocol_name:sub(1, -2)
-            MSState.helloPacketId = pinfo.number
+            state.listenerMSver = protocol_name:sub(1, -2)
+            state.helloPacketId = pinfo.number
             return
         end
         -- ack/nack packets
@@ -59,13 +66,13 @@ local function dissect_handshake(buffer, pinfo)
             return
         end
 
-        MSState.supported = protocol_name:sub(1, -2) == MSState.protocol
-        MSState.handshaked = true
-        MSState.ackPacketId = pinfo.number
+        state.supported = protocol_name:sub(1, -2) == state.protocol
+        state.handshaked = true
+        state.ackPacketId = pinfo.number
         return
     end
 
-    if(MSState.dialerMSver == nil) then
+    if(state.dialerMSver == nil) then
         -- select packet with protocol version
         if (packet_len < 21) then
             -- TODO: reassemble
@@ -83,16 +90,30 @@ local function dissect_handshake(buffer, pinfo)
             return
         end
 
-        MSState.dialerMSver = protocol_name:sub(1, -2)
-        MSState.protocol = req_protocol_name:sub(1, -2)
-        MSState.selectPacketId = pinfo.number
+        state.dialerMSver = protocol_name:sub(1, -2)
+        state.protocol = req_protocol_name:sub(1, -2)
+        state.selectPacketId = pinfo.number
     end
 end
 
 -- this disssector should be called after the "multistream 1.0.0" string observed
 function multistream_proto.dissector (buffer, pinfo, tree)
-    if (not MSState.handshaked) then
-        dissect_handshake(buffer, pinfo)
+    local state_id = pinfo.private[private_state_key]
+    if (state_id == nil) then
+        -- it is impossible to continue work without state
+        --print("multistream dissector: field pinfo.private.state_id doesn't set")
+        return
+    end
+
+    local state = states[state_id]
+    if (not state) then
+        -- it is impossible to continue work without state
+        print("multistream dissector: error while getting state with id " .. state_id)
+        return
+    end
+
+    if (not state.handshaked) then
+        dissect_handshake(buffer, pinfo, state)
     end
 
     local subtree = tree:add(multistream_proto, multistream_proto.description)
@@ -100,34 +121,34 @@ function multistream_proto.dissector (buffer, pinfo, tree)
     pinfo.cols.protocol = multistream_proto.name
     pinfo.cols.info = "multistream"
 
-    if (MSState.helloPacketId == pinfo.number) then
-        pinfo.cols.info = string.format("%s ready (%s)", pinfo.cols.info, MSState.listenerMSver)
-        subtree:add(fields.multistream_version, buffer(0, packet_len)):append_text(" (" .. MSState.listenerMSver .. ")")
-    elseif (MSState.selectPacketId == pinfo.number) then
-        pinfo.cols.info = string.format("%s ready (%s) select (%s)", pinfo.cols.info, MSState.dialerMSver, MSState.protocol)
-        subtree:add(fields.multistream_version, buffer(0, 20)):append_text(" (" .. MSState.dialerMSver .. ")")
-        subtree:add(fields.multistream_protocol, buffer(21, -1)):append_text(" (" .. MSState.protocol .. ")")
-    elseif (MSState.ackPacketId == pinfo.number) then
-        if(MSState.supported) then
-            pinfo.cols.info = string.format("%s ACK (%s)", pinfo.cols.info, MSState.protocol)
+    if (state.helloPacketId == pinfo.number) then
+        pinfo.cols.info = string.format("%s ready (%s)", pinfo.cols.info, state.listenerMSver)
+        subtree:add(fields.multistream_version, buffer(0, packet_len)):append_text(" (" .. state.listenerMSver .. ")")
+    elseif (state.selectPacketId == pinfo.number) then
+        pinfo.cols.info = string.format("%s ready (%s) select (%s)", pinfo.cols.info, state.dialerMSver, state.protocol)
+        subtree:add(fields.multistream_version, buffer(0, 20)):append_text(" (" .. state.dialerMSver .. ")")
+        subtree:add(fields.multistream_protocol, buffer(21, -1)):append_text(" (" .. state.protocol .. ")")
+    elseif (state.ackPacketId == pinfo.number) then
+        if(state.supported) then
+            pinfo.cols.info = string.format("%s ACK (%s)", pinfo.cols.info, state.protocol)
         else
             pinfo.cols.info = string.format("%s NACK", pinfo.cols.info)
         end
-        subtree:add(fields.multistream_protocol, buffer(0, packet_len)):append_text(" (" .. MSState.protocol .. ")")
+        subtree:add(fields.multistream_protocol, buffer(0, packet_len)):append_text(" (" .. state.protocol .. ")")
     else
-        if (MSState.protocol == "/secio/1.0.0") then
-            subtree:add(fields.multistream_protocol, buffer(0, 0)):append_text(" (" .. MSState.protocol .. ")")
+        if (state.protocol == "/secio/1.0.0") then
+            subtree:add(fields.multistream_protocol, buffer(0, 0)):append_text(" (" .. state.protocol .. ")")
 
-            pinfo.private["listener_ip"] = MSState.listener["ip"]
-            pinfo.private["listener_port"] = MSState.listener["port"]
-            pinfo.private["dialer_ip"] = MSState.dialer["ip"]
-            pinfo.private["dialer_port"] = MSState.dialer["port"]
+            pinfo.private["listener_ip"] = state.listener["ip"]
+            pinfo.private["listener_port"] = state.listener["port"]
+            pinfo.private["dialer_ip"] = state.dialer["ip"]
+            pinfo.private["dialer_port"] = state.dialer["port"]
             Dissector.get("secio"):call(buffer, pinfo, tree)
             return
         end
 
-        if(MSState.protocol ~= nil) then
-            print(string.format("multistream dissector: %s protocol is unsuported", MSState.protocol))
+        if(state.protocol ~= nil) then
+            print(string.format("multistream dissector: %s protocol is unsuported", state.protocol))
         else
             print("multistream dissector: underlying protocol is unsuported")
         end
@@ -155,7 +176,6 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.src_port, multistream_proto)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
-    -- TODO: add to MSState support of multi ip/port
     if packet_len > m_ready_packet_size then
         set_address(MSState.dialer, pinfo.src, pinfo.src_port)
         set_address(MSState.listener, pinfo.dst, pinfo.dst_port)
@@ -170,6 +190,14 @@ local function m_heuristic_checker(buffer, pinfo, tree)
         tostring(MSState.dialer.ip),
         tostring(MSState.dialer.port))
     )
+
+    local new_state = t.table_copy(MSState)
+    local id = tostring(last_state_id)
+    print(new_state.listener.ip)
+    states[id] = new_state
+
+    pinfo.private[private_state_key] = id
+    last_state_id = last_state_id + 1
 
     multistream_proto.dissector(buffer, pinfo, tree)
     return true

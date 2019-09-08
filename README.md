@@ -1,6 +1,6 @@
-# SECIO Protocol Dissector
+# Libp2p dissector
 
-A Wireshark Lua plugin to dissect SECIO protocol packets with support of decryption. This plugin indended to run with go-libp2p-secio [fork](https://github.com/michaelvoronov/go-libp2p-secio) since it supports dumping secret symmetric keys. 
+A Wireshark Lua plugin to dissect several libp2p protocols with support of SECIO decryption. This plugin indended to run with go-libp2p-secio [fork](https://github.com/michaelvoronov/go-libp2p-secio) since it supports dumping secret symmetric keys. 
 
 ## Usage:
 Copy the whole directory into your Wireshark `Personal Plugins` folder. To find out where it is located, open Wireshark and go to **Help->About Wireshark** and it will be listed in the **Folders** tab. You may need to create the folder the first time.
@@ -23,6 +23,15 @@ You need some lua packets installed:
    - base64 (`luarocks install lbase64`)
    
 Please be sure, that Wireshark has access to these plugins on your setup.
+
+## Supported protocols
+
+- [X] multistream 1.0.0
+- [X] secio 1.0.0
+- [X] mplex 1.0.0
+- [ ] yamux
+- [ ] spdy
+- [ ] ipfs
 
 ## High-level dissecting algorithm overview
 

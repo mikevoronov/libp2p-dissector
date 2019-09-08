@@ -27,15 +27,15 @@ local SecioState = {
     decryptedPayloads = {},
 
     -- size of listener HMAC in bytes
-    listenerHMACSize = -1,
+    listenerHMACType = nil,
 
     -- size of dialer HMAC in bytes
-    dialerHMACSize = -1,
+    dialerHMACType = nil,
 
-    -- lamdba that can decrypt listener messages
+    -- lambda that can decrypt listener messages
     listenerMsgDecryptor = nil,
 
-    -- lamdba that can decrypt dialer messages
+    -- lambda that can decrypt dialer messages
     dialerMsgDecryptor = nil,
 
     -- table contains different crypto parameters from the config file
@@ -56,8 +56,8 @@ function SecioState:init_crypto_params(pinfo)
     self.cryptoParams = config:load_config_for(pinfo.src, pinfo.src_port, pinfo.dst, pinfo.dst_port)
     assert(next(self.cryptoParams) ~= nil, "secio dissector: error while reading config file")
 
-    self.listenerHMACSize = utils:hashSize(self.cryptoParams.local_hmac_type)
-    self.dialerHMACSize = utils:hashSize(self.cryptoParams.remote_hmac_type)
+    self.listenerHMACType = self.cryptoParams.local_hmac_type
+    self.dialerHMACType = self.cryptoParams.remote_hmac_type
     self.listenerMsgDecryptor = utils:makeMsgDecryptor(
         self.cryptoParams.local_cipher_type,
         self.cryptoParams.local_key,

@@ -117,6 +117,8 @@ function multistream_proto.dissector (buffer, pinfo, tree)
         subtree:add(fields.multistream_protocol, buffer(0, packet_len)):append_text(" (" .. MSState.protocol .. ")")
     else
         if (MSState.protocol == "/secio/1.0.0") then
+            subtree:add(fields.multistream_protocol, buffer(0, 0)):append_text(" (" .. MSState.protocol .. ")")
+
             pinfo.private["listener_ip"] = MSState.listener["ip"]
             pinfo.private["listener_port"] = MSState.listener["port"]
             pinfo.private["dialer_ip"] = MSState.dialer["ip"]
@@ -125,7 +127,11 @@ function multistream_proto.dissector (buffer, pinfo, tree)
             return
         end
 
-        error(MSState.protocol .. " protocol is unsuported")
+        if(MSState.protocol ~= nil) then
+            print(string.format("multistream dissector: %s protocol is unsuported", MSState.protocol))
+        else
+            print("multistream dissector: underlying protocol is unsuported")
+        end
     end
 end
 

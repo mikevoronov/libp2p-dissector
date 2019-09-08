@@ -3,10 +3,14 @@ if not _G['secio_dissector'] then return end
 
 local pb = require ("pb")
 local SecioState = require ("secio_state")
+local utils = require ("secio_misc")
 
 secio_proto = Proto("secio", "SECIO protocol")
 
 local fields = secio_proto.fields
+
+-- field related to secio packet size
+fields.packet_len = ProtoField.uint32 ("secio.packet_size", "Packet size", base.HEX, nil, 0, "Secio packet size in bytes")
 
 -- fields related to Propose packets type
 fields.propose = ProtoField.bytes ("secio.propose", "Propose", base.NONE, nil, 0, "Propose request")
@@ -20,6 +24,10 @@ fields.hashes = ProtoField.string ("secio.propose.hashes", "hashes", base.NONE, 
 fields.exchange = ProtoField.bytes ("secio.exchange", "exchange", base.NONE, nil, 0, "Exchange request")
 fields.epubkey = ProtoField.bytes ("secio.exchange.epubkey", "epubkey", base.NONE, nil, 0, "Ephermal public key")
 fields.signature = ProtoField.bytes ("secio.exchange.signature", "signature", base.NONE, nil, 0, "Exchange signature")
+
+-- fields related to Body packets type
+fields.cipher_text = ProtoField.bytes ("secio.body.cipher_text", "cipher text", base.NONE, nil, 0, "Cipher text")
+fields.hmac = ProtoField.bytes ("secio.body.hmac", "HMAC", base.NONE, nil, 0, "HMAC of cipher text")
 
 local function dissect_handshake(buffer, pinfo)
     local is_listener = false
@@ -58,7 +66,7 @@ local function dissect_handshake(buffer, pinfo)
 end
 
 local function parse_and_set_propose(buffer, tree)
-    tree:add(buffer(0, 4), string.format("Propose message size 0x%x bytes", buffer:len()))
+    tree:add(fields.packet_len, buffer(0, 4))
     local branch = tree:add("Propose", fields.propose)
 
     local propose = assert(pb.decode("Propose", buffer:raw(4, -1)))
@@ -92,7 +100,7 @@ local function parse_and_set_propose(buffer, tree)
 end
 
 local function parse_and_set_exchange(buffer, tree)
-    tree:add(buffer(0, 4), string.format("Exchange message size 0x%x bytes", buffer:len()))
+    tree:add(fields.packet_len, buffer(0, 4))
     local branch = tree:add("Exchange", fields.exchange)
 
     local exchange = assert(pb.decode("Exchange", buffer:raw(4, -1)))
@@ -132,16 +140,16 @@ function secio_proto.dissector (buffer, pinfo, tree)
 
     if (SecioState.listenerProposePacketId == pinfo.number) then
         pinfo.cols.info = "SECIO: Propose (listener)"
-        parse_and_set_propose(buffer, tree)
+        parse_and_set_propose(buffer, subtree)
     elseif (SecioState.dialerProposePacketId == pinfo.number) then
         pinfo.cols.info = "SECIO: Propose (dialer)"
-        parse_and_set_propose(buffer, tree)
+        parse_and_set_propose(buffer, subtree)
     elseif (SecioState.listenerExchangePacketId == pinfo.number) then
         pinfo.cols.info = "SECIO Exchange (listener)"
-        parse_and_set_exchange(buffer, tree)
+        parse_and_set_exchange(buffer, subtree)
     elseif (SecioState.dialerExchangePacketId == pinfo.number) then
         pinfo.cols.info = "SECIO Exchange (dialer)"
-        parse_and_set_exchange(buffer, tree)
+        parse_and_set_exchange(buffer, subtree)
     elseif (SecioState.handshaked) then
         -- encrypted packets
 
@@ -151,16 +159,18 @@ function secio_proto.dissector (buffer, pinfo, tree)
 
         pinfo.cols.info = "SECIO Body"
         local plain_text = ""
-        local hmac_size = SecioState.listenerHMACSize
+        local hmac_type = SecioState.listenerHMACType
+        local hmac_size = utils:hashSize(SecioState.listenerHMACType)
 
         -- if see this packet for the first time, we need to decrypt it
         if not pinfo.visited then
             -- [4 bytes len][ cipher_text ][ H(cipher_text) ]
             if (is_same_src_address(SecioState.listener, pinfo)) then
-                plain_text = SecioState.listenerMsgDecryptor(buffer:raw(4, packet_len - SecioState.listenerHMACSize))
+                plain_text = SecioState.listenerMsgDecryptor(buffer:raw(4, packet_len - hmac_size))
             else
-                plain_text = SecioState.dialerMsgDecryptor(buffer:raw(4, packet_len - SecioState.dialerHMACSize))
-                hmac_size = SecioState.dialerHMACSize
+                hmac_type = SecioState.dialerHMACType
+                hmac_size = utils:hashSize(SecioState.dialerHMACType)
+                plain_text = SecioState.dialerMsgDecryptor(buffer:raw(4, packet_len - hmac_size))
             end
 
             SecioState.decryptedPayloads[pinfo.number] = plain_text
@@ -169,19 +179,19 @@ function secio_proto.dissector (buffer, pinfo, tree)
         end
 
         local offset = 0
-        subtree:add(buffer(offset, 4), string.format("SECIO packet size: 0x%X bytes", packet_len))
+        subtree:add(fields.packet_len, buffer(offset, 4))
         offset = offset + 4
 
         plain_text = Struct.tohex(tostring(plain_text))
-        local mplexTree = subtree:add(buffer(offset, packet_len - hmac_size),
-            string.format("cipher text: plain text is (0x%X bytes) %s", #plain_text, plain_text)
+        subtree:add(buffer(offset, packet_len - hmac_size),
+            string.format("cipher text 0x%X bytes: (plain text is %s )", #plain_text, plain_text)
         )
         offset = offset + packet_len - hmac_size
 
-        subtree:add(buffer(offset, -1), string.format("HMAC (0x%X bytes)", hmac_size))
+        subtree:add(fields.hmac, buffer(offset, -1)):append_text(string.format("(%s)", hmac_type))
 
         pinfo.private["plain_text"] = plain_text
-        Dissector.get("mplex"):call(buffer, pinfo, mplexTree)
+        Dissector.get("mplex"):call(buffer, pinfo, tree)
     end
 end
 

@@ -1,7 +1,6 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-local config = require("config")
 MSState = require("multistream_state")
 
 require("length-prefixed")
@@ -10,7 +9,7 @@ require("net_addresses")
 multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
 local fields = multistream_proto.fields
 
--- Multistream fields
+-- Multistream protocol fields
 fields.multistream_protocol = ProtoField.string ("multistream.protocol", "Protocol", base.NONE, nil, 0, "Protocol being negotiated on")
 fields.multistream_raw_protocol = ProtoField.string ("multistream.raw_protocol", "Raw Protocol", base.NONE, nil, 0, "Protocol being negotiated on (only set on packets with raw data)")
 fields.multistream_version = ProtoField.string ("multistream.version", "Version", base.NONE, nil, 0, "Multistream version used")
@@ -137,8 +136,9 @@ end
 
 -- returns true if some packet contains a length-prefixed string "/multistream/1.0.0\n"
 local function m_heuristic_checker(buffer, pinfo, tree)
-    packet_len = buffer:len()
-    if packet_len < 0x14 then
+    local m_ready_packet_size = 0x14
+    local packet_len = buffer:len()
+    if packet_len < m_ready_packet_size then
         return false
     end
 
@@ -156,7 +156,7 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
     -- TODO: add to MSState support of multi ip/port
-    if packet_len > 14 then
+    if packet_len > m_ready_packet_size then
         set_address(MSState.dialer, pinfo.src, pinfo.src_port)
         set_address(MSState.listener, pinfo.dst, pinfo.dst_port)
     else

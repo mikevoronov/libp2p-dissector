@@ -1,4 +1,4 @@
-local libp2p_dissector_version = "0.1.4"
+local libp2p_dissector_version = "0.1.5"
 
 -- latest development release of Wireshark supports plugin version information
 if set_plugin_info then

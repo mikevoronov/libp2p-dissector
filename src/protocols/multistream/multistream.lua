@@ -2,6 +2,7 @@
 if not _G['secio_dissector'] then return end
 
 local MSStates = require("multistream_state")
+local SecioStates = require ("secio_state")
 require("length-prefixed")
 require("net_addresses")
 
@@ -101,7 +102,6 @@ function multistream_proto.dissector (buffer, pinfo, tree)
         ))
         return
     end
-    print(state.listener)
 
     if (not state.handshaked) then
         dissect_handshake(buffer, pinfo, state)
@@ -130,10 +130,6 @@ function multistream_proto.dissector (buffer, pinfo, tree)
         if (state.protocol == "/secio/1.0.0") then
             subtree:add(fields.multistream_protocol, buffer(0, 0)):append_text(" (" .. state.protocol .. ")")
 
-            pinfo.private["listener_ip"] = state.listener["ip"]
-            pinfo.private["listener_port"] = state.listener["port"]
-            pinfo.private["dialer_ip"] = state.dialer["ip"]
-            pinfo.private["dialer_port"] = state.dialer["port"]
             Dissector.get("secio"):call(buffer, pinfo, tree)
             return
         end
@@ -167,22 +163,23 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.src_port, multistream_proto)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
-    local state = MSStates:addNewState(pinfo)
+    local m_state = MSStates:addNewState(pinfo)
+    local s_state = SecioStates:addNewState(pinfo)
 
     if packet_len > m_ready_packet_size then
-        set_address(state.dialer, pinfo.src, pinfo.src_port)
-        set_address(state.listener, pinfo.dst, pinfo.dst_port)
+        set_address(m_state.dialer, pinfo.src, pinfo.src_port)
+        set_address(m_state.listener, pinfo.dst, pinfo.dst_port)
     else
-        set_address(state.listener, pinfo.src, pinfo.src_port)
-        set_address(state.dialer, pinfo.dst, pinfo.dst_port)
+        set_address(m_state.listener, pinfo.src, pinfo.src_port)
+        set_address(m_state.dialer, pinfo.dst, pinfo.dst_port)
     end
-    print(state.listener)
+    SecioStates:init_with_mstate(s_state, m_state)
 
     print(string.format("multistream dissector: dissector for (listener %s:%s) - (dialer %s:%s) registered",
-        tostring(state.listener.ip),
-        tostring(state.listener.port),
-        tostring(state.dialer.ip),
-        tostring(state.dialer.port))
+        tostring(m_state.listener.ip),
+        tostring(m_state.listener.port),
+        tostring(m_state.dialer.ip),
+        tostring(m_state.dialer.port))
     )
 
     multistream_proto.dissector(buffer, pinfo, tree)

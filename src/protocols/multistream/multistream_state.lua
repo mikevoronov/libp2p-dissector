@@ -1,36 +1,63 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
+require("net_addresses")
 
-local MSState = {
+local MSStates = {}
+
+local function initState(state)
     -- address of a listener peer
-    listener = {},
+    state.listener = {}
 
     -- address of a dialer peer
-    dialer = {},
+    state.dialer = {}
 
     -- multistream protocol version of a listener peer
-    listenerMSver = nil,
+    state.listenerMSver = nil
 
     -- multistream protocol version of a dieler peer
-    dialerMSver = nil,
+    state.dialerMSver = nil
 
     -- synchronized protocol version
-    protocol = nil,
+    state.protocol = nil
 
     -- true, if dialer supports proposal protocol
-    supported = false,
+    state.supported = false
 
     -- number of a hello packet
-    helloPacketId = -1,
+    state.helloPacketId = -1
 
     -- number of a select packet
-    selectPacketId = -1,
+    state.selectPacketId = -1
 
     -- number of a ack packet
-    ackPacketId = -1,
+    state.ackPacketId = -1
 
     -- true, if all of hello, select and ack packets have been seen
-    handshaked = false,
-}
+    state.handshaked = false
+end
 
-return MSState
+function MSStates:addNewState(pinfo)
+    -- check that there is already such state
+    local key_1, key_2 = transform_pinfo_to_keys(pinfo)
+    if self[key_1] ~= nil then
+        return self[key_1]
+    elseif self[key_2] ~= nil then
+        return self[key_2]
+    end
+    self[key_1] = {}
+    initState(self[key_1])
+
+    return self[key_1]
+end
+
+function MSStates:getState(pinfo)
+    -- check that there is already such state
+    local key_1, key_2 = transform_pinfo_to_keys(pinfo)
+    if self[key_1] ~= nil then
+        return self[key_1]
+    end
+
+    return self[key_2]
+end
+
+return MSStates

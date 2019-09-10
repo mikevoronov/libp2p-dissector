@@ -17,3 +17,9 @@ function set_address(table, ip, port)
     table["ip"] = tostring(ip)
     table["port"] = tostring(port)
 end
+
+function transform_pinfo_to_keys(pinfo)
+    local key_1 = string.format("%s:%s:%s:%s", pinfo.src, pinfo.src_port, pinfo.dst, pinfo.dst_port)
+    local key_2 = string.format("%s:%s:%s:%s", pinfo.dst, pinfo.dst_port, pinfo.src, pinfo.src_port)
+    return key_1, key_2
+end

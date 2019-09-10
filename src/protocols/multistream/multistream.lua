@@ -1,17 +1,9 @@
 -- prevent wireshark loading this file as a plugin
 if not _G['secio_dissector'] then return end
 
-local MSState = require("multistream_state")
+local MSStates = require("multistream_state")
 require("length-prefixed")
 require("net_addresses")
-local t = require("table_copy")
-
--- multistream protocol states to support multiple communication
-states = {}
--- id of the last added state to states table
-local last_state_id = 0
--- key used to lookup states id inside private table of pinfo
-local private_state_key = "m_state_id"
 
 multistream_proto = Proto ("multistream", "multistream 1.0.0 protocol")
 local fields = multistream_proto.fields
@@ -98,19 +90,18 @@ end
 
 -- this disssector should be called after the "multistream 1.0.0" string observed
 function multistream_proto.dissector (buffer, pinfo, tree)
-    local state_id = pinfo.private[private_state_key]
-    if (state_id == nil) then
-        -- it is impossible to continue work without state
-        --print("multistream dissector: field pinfo.private.state_id doesn't set")
-        return
-    end
-
-    local state = states[state_id]
+    local state = MSStates:getState(pinfo)
     if (not state) then
         -- it is impossible to continue work without state
-        print("multistream dissector: error while getting state with id " .. state_id)
+        print(string.format("multistream dissector: error while getting state on %s:%s - %s:%s",
+            tonumber(pinfo.src),
+            tonumber(pinfo.src_port),
+            tonumber(pinfo.dst),
+            tonumber(pinfo.dst_port)
+        ))
         return
     end
+    print(state.listener)
 
     if (not state.handshaked) then
         dissect_handshake(buffer, pinfo, state)
@@ -176,28 +167,23 @@ local function m_heuristic_checker(buffer, pinfo, tree)
     tcp_table:add(pinfo.src_port, multistream_proto)
     tcp_table:add(pinfo.dst_port, multistream_proto)
 
+    local state = MSStates:addNewState(pinfo)
+
     if packet_len > m_ready_packet_size then
-        set_address(MSState.dialer, pinfo.src, pinfo.src_port)
-        set_address(MSState.listener, pinfo.dst, pinfo.dst_port)
+        set_address(state.dialer, pinfo.src, pinfo.src_port)
+        set_address(state.listener, pinfo.dst, pinfo.dst_port)
     else
-        set_address(MSState.listener, pinfo.src, pinfo.src_port)
-        set_address(MSState.dialer, pinfo.dst, pinfo.dst_port)
+        set_address(state.listener, pinfo.src, pinfo.src_port)
+        set_address(state.dialer, pinfo.dst, pinfo.dst_port)
     end
+    print(state.listener)
 
     print(string.format("multistream dissector: dissector for (listener %s:%s) - (dialer %s:%s) registered",
-        tostring(MSState.listener.ip),
-        tostring(MSState.listener.port),
-        tostring(MSState.dialer.ip),
-        tostring(MSState.dialer.port))
+        tostring(state.listener.ip),
+        tostring(state.listener.port),
+        tostring(state.dialer.ip),
+        tostring(state.dialer.port))
     )
-
-    local new_state = t.table_copy(MSState)
-    local id = tostring(last_state_id)
-    print(new_state.listener.ip)
-    states[id] = new_state
-
-    pinfo.private[private_state_key] = id
-    last_state_id = last_state_id + 1
 
     multistream_proto.dissector(buffer, pinfo, tree)
     return true

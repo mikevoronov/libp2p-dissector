@@ -95,10 +95,10 @@ function multistream_proto.dissector (buffer, pinfo, tree)
     if (not state) then
         -- it is impossible to continue work without state
         print(string.format("multistream dissector: error while getting state on %s:%s - %s:%s",
-            tonumber(pinfo.src),
-            tonumber(pinfo.src_port),
-            tonumber(pinfo.dst),
-            tonumber(pinfo.dst_port)
+            tostring(pinfo.src),
+            tostring(pinfo.src_port),
+            tostring(pinfo.dst),
+            tostring(pinfo.dst_port)
         ))
         return
     end

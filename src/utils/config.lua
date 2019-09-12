@@ -1,5 +1,5 @@
 -- prevent wireshark loading this file as a plugin
-if not _G['secio_dissector'] then return end
+if not _G['libp2p_dissector'] then return end
 
 local csv = require("csv")
 local base64 = require ("base64")

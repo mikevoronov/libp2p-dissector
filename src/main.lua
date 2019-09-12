@@ -17,7 +17,7 @@ if set_plugin_info then
 end
 
 -- enable loading of our modules
-_G['secio_dissector'] = {}
+_G['libp2p_dissector'] = {}
 
 -- check that LIBP2P_SECIO_KEYLOG set
 local key_file_path = os.getenv("LIBP2P_SECIO_KEYLOG")

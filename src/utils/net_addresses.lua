@@ -1,5 +1,5 @@
 -- prevent wireshark loading this file as a plugin
-if not _G['secio_dissector'] then return end
+if not _G['libp2p_dissector'] then return end
 
 function is_same_addresses(table, ip, port)
     return next(table) ~= nil and table["ip"] == tostring(ip) and table["port"] == tostring(port)

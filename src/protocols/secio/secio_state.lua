@@ -1,5 +1,5 @@
 -- prevent wireshark loading this file as a plugin
-if not _G['secio_dissector'] then return end
+if not _G['libp2p_dissector'] then return end
 
 local config = require ("config")
 local utils = require ("secio_misc")
@@ -48,6 +48,7 @@ local function initState(state)
     state.handshaked = false
 end
 
+-- refactor functions related to states to a separate module
 function SecioStates:addNewState(pinfo)
     -- check that there is already such state
     local key_1, key_2 = transform_pinfo_to_keys(pinfo)
